@@ -1,6 +1,4 @@
-
-// Type for the next function in middleware
+// Next function type for middleware
 export type NextFunction = (err?: Error) => void;
-
-// Type for asynchronous middleware functions
+// Async middleware type
 export type AsyncMiddleware<TArgs extends unknown[]> = (...args: TArgs) => Promise<unknown>;
