@@ -16,3 +16,17 @@ export type Expirable = {
 
 // Type for unique entity identifiers
 export type EntityId = string;
+
+// Type for entities with only timestamps
+export type Timestamps = {
+  createdAt: number;
+};
+// Type for entities that track activity
+export type ActivityTracked = {
+  lastActiveAt: number;
+};
+
+// Request context type to hold current user information
+export type RequestUserContext = {
+  currentUserId?: EntityId;
+};
