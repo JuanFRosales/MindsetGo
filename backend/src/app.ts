@@ -5,6 +5,8 @@ import { registerSessionAuth } from "./middlewares/sessionAuth.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { userRoutes } from "./routes/users.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { adminRoutes } from "./routes/admin.ts";
+
 
 export const buildApp = () => {
   const app = Fastify({
@@ -25,6 +27,7 @@ export const buildApp = () => {
   app.register(healthRoutes);
   app.register(userRoutes);
   app.register(authRoutes);
+  app.register(adminRoutes);
 
   return app;
 };

@@ -15,5 +15,10 @@ export const env = {
   userTtlDays: Number(requireEnv("USER_TTL_DAYS", "14")),
   inviteTtlHours: Number(requireEnv("INVITE_TTL_HOURS", "24")),
   sessionTtlMinutes: Number(requireEnv("SESSION_TTL_MINUTES", "15")),
-  cookieName: requireEnv("COOKIE_NAME", "sid")
+  cookieName: requireEnv("COOKIE_NAME", "sid"),
+  ttlCron: process.env.TTL_CRON ?? "0 3 * * *",
+  ttlEnabled: (process.env.TTL_ENABLED ?? "true") === "true",
+  inviteUsedRetentionHours: Number(
+    process.env.INVITE_USED_RETENTION_HOURS ?? "24",
+  ),
 };
