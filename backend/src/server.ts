@@ -3,10 +3,8 @@ import { buildApp } from "./app.js";
 
 const app = buildApp();
 
-
- // Server start and shutdown handling
-
-async function start() {
+// Server start and shutdown handling
+const start = async (): Promise<void> => {
   try {
     const address = await app.listen({ 
       port: env.port, 
@@ -18,7 +16,7 @@ async function start() {
     app.log.error(err);
     process.exit(1);
   }
-}
+};
 
 // Handle unhandled rejections outside of Fastify
 process.on("unhandledRejection", (err) => {
@@ -26,4 +24,5 @@ process.on("unhandledRejection", (err) => {
   process.exit(1);
 });
 
-start();
+// Suoritetaan käynnistys
+void start();

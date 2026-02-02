@@ -1,7 +1,7 @@
 import type { NextFunction, AsyncMiddleware } from "../types/projectTypes.ts";
 
 // Wrapper to handle async errors in middleware
-export function asyncHandler<TArgs extends unknown[]>(fn: AsyncMiddleware<TArgs>) {
+export const asyncHandler = <TArgs extends unknown[]>(fn: AsyncMiddleware<TArgs>) => {
   return (...args: TArgs): void => {
     const next = args[2];
 
@@ -14,4 +14,4 @@ export function asyncHandler<TArgs extends unknown[]>(fn: AsyncMiddleware<TArgs>
       console.error("Unhandled error in asyncHandler:", err);
     });
   };
-}
+};
