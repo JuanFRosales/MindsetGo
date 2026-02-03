@@ -8,6 +8,9 @@ import { authRoutes } from "./routes/auth.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { qrRoutes } from "./routes/qr.ts";
 import { webauthnRoutes } from "./routes/webauthn.ts";
+import staticPlugin from "@fastify/static";
+import { join } from "node:path";
+
 
 
 
@@ -20,6 +23,12 @@ export const buildApp = () => {
           : undefined,
     },
   });
+  // Static files
+  app.register(staticPlugin, {
+  root: join(process.cwd(), "public"),
+  prefix: "/"
+});
+
 
   app.register(cookie);
   // Error handling

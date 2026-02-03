@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <title>Backend demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    h2 { border-top: 1px solid #ccc; padding-top: 20px; margin-top: 30px; }
+    button { margin: 4px 0; padding: 8px 12px; cursor: pointer; background: #eee; border: 1px solid #999; border-radius: 4px; }
+    button:hover { background: #ddd; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 5px; }
+    pre { background: #f4f4f4; padding: 12px; overflow-x: auto; border-radius: 4px; min-height: 1.2em; border: 1px solid #ddd; }
+    .row { margin-bottom: 15px; }
+    .error { color: #d32f2f; background: #ffebee; border-color: #ffcdd2; }
+    canvas { background: #fff; margin-top: 10px; border: 1px solid #eee; }
+  </style>
+</head>
+<body>
+
+<h1>Backend demo</h1>
+
+<h2>1 Invite</h2>
+<button onclick="createInvite()">Create invite</button>
+<pre id="inviteOut"></pre>
+
+<h2>2 QR</h2>
+<button onclick="newQr()">Generate QR</button>
+<div class="row"><strong>qrId:</strong> <span id="id-display">-</span></div>
+<canvas id="qr"></canvas>
+
+<h2>3 QR scan</h2>
+<input id="inviteInput" placeholder="Invite code" />
+<button onclick="scanQr()">Scan QR</button>
+<pre id="scanOut"></pre>
+
+<h2>4 Passkey registration</h2>
+<button onclick="registerPasskey()">Register passkey</button>
+<pre id="registerOut"></pre>
+
+<h2>5 Passkey login</h2>
+<button onclick="loginPasskey()">Login with passkey</button>
+<pre id="loginOut"></pre>
+
+<h2>6 Session</h2>
+<button onclick="createSession()">Create session</button>
+<button onclick="me()">Auth me</button>
+<button onclick="logout()">Logout</button>
+<pre id="sessionOut"></pre>
+
+<h2>7 Admin</h2>
+<button onclick="cleanup()">Run TTL cleanup</button>
+<pre id="adminOut"></pre>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script>
+let state = {
+  qrId: null,
+  resolutionId: null,
+  userId: null
+};
+
+const fetchJson = async (url, init) => {
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { json = { raw: text }; }
+  if (!res.ok) throw new Error(text);
+  return json;
+};
+
+const padB64 = s => s + "=".repeat((4 - s.length % 4) % 4);
+
+const b64uToBuf = s => {
+  const b64 = padB64(s.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+};
+
+const bufToB64u = b => {
+  const u8 = b instanceof ArrayBuffer ? new Uint8Array(b) : new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+  return btoa(String.fromCharCode(...u8))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+};
+
+const log = (id, obj) => {
+  const el = document.getElementById(id);
+  el.classList.remove("error");
+  el.textContent = JSON.stringify(obj, null, 2);
+};
+
+const logError = (id, err) => {
+  const el = document.getElementById(id);
+  el.classList.add("error");
+  el.textContent = err.message || String(err);
+};
+
+async function createInvite() {
+  try {
+    const j = await fetchJson("/invites", {
+      method: "POST",
+      headers: { "x-admin-key": "dev-admin-key" }
+    });
+    document.getElementById("inviteInput").value = j.code;
+    log("inviteOut", j);
+  } catch (e) { logError("inviteOut", e); }
+}
+
+async function newQr() {
+  state.qrId = crypto.randomUUID();
+  document.getElementById("id-display").textContent = state.qrId;
+  await QRCode.toCanvas(document.getElementById("qr"), JSON.stringify({ qrId: state.qrId }));
+}
+
+async function scanQr() {
+  try {
+    const inviteCode = document.getElementById("inviteInput").value.trim();
+    const body = inviteCode ? { qrId: state.qrId, inviteCode } : { qrId: state.qrId };
+    const j = await fetchJson("/qr/scan", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    state.resolutionId = j.resolutionId;
+    state.userId = j.userId;
+    log("scanOut", j);
+  } catch (e) { logError("scanOut", e); }
+}
+
+async function registerPasskey() {
+  try {
+    const { challengeId, options } = await fetchJson("/webauthn/register/options", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ resolutionId: state.resolutionId })
+    });
+
+    options.challenge = b64uToBuf(options.challenge);
+    options.user.id = b64uToBuf(options.user.id);
+
+    const cred = await navigator.credentials.create({ publicKey: options });
+    const rawId = bufToB64u(cred.rawId);
+
+    const payload = {
+      challengeId,
+      response: {
+        id: rawId,
+        rawId,
+        type: cred.type,
+        response: {
+          clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+          attestationObject: bufToB64u(cred.response.attestationObject)
+        },
+        clientExtensionResults: cred.getClientExtensionResults()
+      }
+    };
+
+    const res = await fetchJson("/webauthn/register/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    log("registerOut", res);
+  } catch (e) { logError("registerOut", e); }
+}
+
+async function loginPasskey() {
+  try {
+    const { challengeId, options } = await fetchJson("/webauthn/login/options", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: state.userId })
+    });
+
+    options.challenge = b64uToBuf(options.challenge);
+    if (options.allowCredentials) {
+      options.allowCredentials = options.allowCredentials.map(c => ({
+        ...c,
+        id: b64uToBuf(c.id)
+      }));
+    }
+
+    const cred = await navigator.credentials.get({ publicKey: options });
+    const rawId = bufToB64u(cred.rawId);
+
+    const resp = {
+      clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+      authenticatorData: bufToB64u(cred.response.authenticatorData),
+      signature: bufToB64u(cred.response.signature)
+    };
+
+    if (cred.response.userHandle) {
+      resp.userHandle = bufToB64u(cred.response.userHandle);
+    }
+
+    const payload = {
+      challengeId,
+      response: {
+        id: rawId,
+        rawId,
+        type: cred.type,
+        response: resp,
+        clientExtensionResults: cred.getClientExtensionResults()
+      }
+    };
+
+    const res = await fetchJson("/webauthn/login/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    log("loginOut", res);
+  } catch (e) { logError("loginOut", e); }
+}
+
+async function createSession() {
+  try {
+    const res = await fetchJson("/auth/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ resolutionId: state.resolutionId, qrId: state.qrId })
+    });
+    log("sessionOut", res);
+  } catch (e) { logError("sessionOut", e); }
+}
+
+async function me() {
+  try {
+    const res = await fetchJson("/auth/me");
+    log("sessionOut", res);
+  } catch (e) { logError("sessionOut", e); }
+}
+
+async function logout() {
+  try {
+    await fetchJson("/auth/logout", { method: "POST" });
+    log("sessionOut", { ok: true });
+  } catch (e) { logError("sessionOut", e); }
+}
+
+async function cleanup() {
+  try {
+    const res = await fetchJson("/admin/cleanup", {
+      method: "POST",
+      headers: { "x-admin-key": "dev-admin-key" }
+    });
+    log("adminOut", res);
+  } catch (e) { logError("adminOut", e); }
+}
+</script>
+</body>
+</html>
