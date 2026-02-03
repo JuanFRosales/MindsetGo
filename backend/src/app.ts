@@ -7,6 +7,7 @@ import { userRoutes } from "./routes/users.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { qrRoutes } from "./routes/qr.ts";
+import { webauthnRoutes } from "./routes/webauthn.ts";
 
 
 
@@ -31,6 +32,7 @@ export const buildApp = () => {
   app.register(authRoutes);
   app.register(adminRoutes);
   app.register(qrRoutes);
+  app.register(webauthnRoutes);
 
   return app;
 };
