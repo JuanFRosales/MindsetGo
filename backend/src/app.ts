@@ -6,6 +6,8 @@ import { healthRoutes } from "./routes/health.ts";
 import { userRoutes } from "./routes/users.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { adminRoutes } from "./routes/admin.ts";
+import { qrRoutes } from "./routes/qr.ts";
+
 
 
 export const buildApp = () => {
@@ -28,6 +30,7 @@ export const buildApp = () => {
   app.register(userRoutes);
   app.register(authRoutes);
   app.register(adminRoutes);
+  app.register(qrRoutes);
 
   return app;
 };

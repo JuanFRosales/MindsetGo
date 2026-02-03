@@ -21,4 +21,7 @@ export const env = {
   inviteUsedRetentionHours: Number(
     process.env.INVITE_USED_RETENTION_HOURS ?? "24",
   ),
+  rpId: requireEnv("RP_ID", "localhost"),
+  rpName: requireEnv("RP_NAME", "Backend demo"),
+  origin: requireEnv("ORIGIN", "http://localhost:3000"),
 };

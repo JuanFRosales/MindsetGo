@@ -31,5 +31,22 @@ process.on("unhandledRejection", (err) => {
   process.exit(1);
 });
 
+// Graceful shutdown for future use in deployment environments
+const shutdown = async (signal: string): Promise<void> => {
+  app.log.info({ signal }, "shutting down");
+
+  try {
+    await app.close();
+  } catch (err) {
+    app.log.error(err, "error during shutdown");
+  } finally {
+    process.exit(0);
+  }
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+
 // Start
 void start();
