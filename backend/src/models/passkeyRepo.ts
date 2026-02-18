@@ -1,6 +1,16 @@
 import type { Database } from "sqlite";
 import type { EntityId, Timestamps } from "../types/projectTypes.ts";
 
+
+export const userHasPasskey = async (db: Database, userId: string): Promise<boolean> => {
+  const row = await db.get<{ c: number }>(
+   "SELECT COUNT(1) as c FROM passkeys WHERE userId = ?",
+    userId,
+  );
+  return (row?.c ?? 0) > 0;
+};
+
+
 export type Passkey = {
   userId: EntityId;
   credentialId: string;

@@ -14,17 +14,18 @@ import {
   upsertSinglePasskey,
   updateCounter,
 } from "../models/passkeyRepo.js";
+import { createLoginProof } from "../models/loginProofRepo.js"; 
 
 const DASH = String.fromCharCode(45);
 
+// User ID is hashed to 32 bytes to create a stable identifier for the authenticator
 const userIdToBytes = (userId: string): Uint8Array =>
-  createHash("sha256").update(userId, "utf8").digest();
-
+  createHash("sha256").update(userId, "utf8").digest(); 
 const padB64 = (s: string): string => {
   const pad = (4 - (s.length % 4)) % 4;
   return s + "=".repeat(pad);
 };
-
+// Convert base64url string to ArrayBuffer
 const b64uToArrayBuffer = (s: string): ArrayBuffer => {
   const b64 = padB64(
     s.replace(new RegExp(DASH, "g"), "+").replace(/_/g, "/"),
@@ -33,6 +34,7 @@ const b64uToArrayBuffer = (s: string): ArrayBuffer => {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 };
 
+// Convert ArrayBuffer or Buffer to base64url string
 const bufLikeToB64u = (b: ArrayBuffer | Uint8Array | Buffer): string => {
   const u8 =
     b instanceof ArrayBuffer
@@ -48,8 +50,10 @@ const bufLikeToB64u = (b: ArrayBuffer | Uint8Array | Buffer): string => {
     .replace(/=+$/g, "");
 };
 
+// Simple check to see if the public key is in PEM format 
 const isPem = (s: string): boolean => s.includes("BEGIN PUBLIC KEY");
 
+// Fido2Lib instance with Relying Party info and options
 const f2l = new Fido2Lib({
   timeout: 60000,
   rpId: env.rpId,
@@ -59,7 +63,9 @@ const f2l = new Fido2Lib({
   authenticatorUserVerification: "preferred",
 });
 
+// WebAuthn routes for registration and login
 export const webauthnRoutes: FastifyPluginAsync = async (app) => {
+  
   app.post("/webauthn/register/options", async (req, reply) => {
     const { resolutionId: rawId } = req.body as { resolutionId?: string };
     const resolutionId = rawId?.trim();
@@ -72,7 +78,7 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
     if (!resolution) {
       return reply.status(400).send({ error: "invalid_resolutionId" });
     }
-
+// Check if user already has a passkey
     const existing = await getPasskeyByUserId(db, resolution.userId);
     if (existing) {
       return reply.status(409).send({ error: "passkey_already_exists" });
@@ -105,9 +111,10 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
       5,
     );
 
-    return { challengeId: ch.id, options };
+    return { challengeId: ch.id, publicKey: options };
   });
 
+  // Registration verification route
   app.post("/webauthn/register/verify", async (req, reply) => {
     const { challengeId: rawChId, response } = req.body as {
       challengeId?: string;
@@ -124,11 +131,11 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
     if (!ch) {
       return reply.status(400).send({ error: "invalid_challenge" });
     }
-
+// ensure the user still doesn't have a passkey
     try {
       if (!response.rawId) return reply.status(400).send({ error: "missing_rawId" });
       if (!response.id) return reply.status(400).send({ error: "missing_id" });
-
+// Convert the response to format expected by fido2-lib
       const attestationResponse: any = {
         id: b64uToArrayBuffer(response.id),
         rawId: b64uToArrayBuffer(response.rawId),
@@ -172,6 +179,7 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // Login routes based on user ID and QR resolution
   app.post("/webauthn/login/options", async (req, reply) => {
     const { userId: rawUserId } = req.body as { userId?: string };
     const userId = rawUserId?.trim();
@@ -202,17 +210,27 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
     };
 
     const ch = await createChallenge(db, userId, "login", options.challenge, 5);
-    return { challengeId: ch.id, options };
+    return { challengeId: ch.id, publicKey: options };
   });
 
+  // verify login response
   app.post("/webauthn/login/verify", async (req, reply) => {
-    const { challengeId: rawChId, response } = req.body as {
+    // Extract and validate input
+    const { 
+      challengeId: rawChId, 
+      resolutionId: rawResId, 
+      response 
+    } = req.body as {
       challengeId?: string;
+      resolutionId?: string;
       response?: any;
     };
 
     const challengeId = rawChId?.trim();
-    if (!challengeId || !response) {
+    const resolutionId = rawResId?.trim();
+
+    // Validation
+    if (!challengeId || !resolutionId || !response) {
       return reply.status(400).send({ error: "bad_request" });
     }
 
@@ -220,6 +238,18 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
     const ch = await getValidChallenge(db, challengeId, "login");
     if (!ch) {
       return reply.status(400).send({ error: "invalid_challenge" });
+    }
+
+    // Ensure the challenge is associated with the resolution and user
+    const resolution = await getValidQrResolution(db, resolutionId);
+    if (!resolution) {
+      await deleteChallenge(db, ch.id);
+      return reply.status(400).send({ error: "invalid_resolutionId" });
+    }
+
+    if (resolution.userId !== ch.userId) {
+      await deleteChallenge(db, ch.id);
+      return reply.status(400).send({ error: "resolution_user_mismatch" });
     }
 
     const pk = await getPasskeyByUserId(db, ch.userId);
@@ -235,7 +265,7 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
         details: "Stored public key is not in PEM format. Delete passkey and register again.",
       });
     }
-
+// verify the assertion response using fido2-lib and handle the result
     try {
       if (!response.rawId) return reply.status(400).send({ error: "missing_rawId" });
       if (!response.id) return reply.status(400).send({ error: "missing_id" });
@@ -253,7 +283,6 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
       };
 
       let userHandleAB: ArrayBuffer | undefined;
-
       if (response.response.userHandle) {
         userHandleAB = b64uToArrayBuffer(response.response.userHandle);
         assertionResponse.response.userHandle = userHandleAB;
@@ -277,8 +306,15 @@ export const webauthnRoutes: FastifyPluginAsync = async (app) => {
       const newCounter: number = Number(authnrData.get("counter") ?? 0);
       await updateCounter(db, ch.userId, newCounter);
 
+      // Create a login proof that client can exchange for a session, then clean up the challenge
+      const proof = await createLoginProof(db, ch.userId, resolutionId, 5);
       await deleteChallenge(db, ch.id);
-      return { ok: true, userId: ch.userId };
+
+      return { 
+        ok: true, 
+        userId: ch.userId, 
+        proofId: proof.id 
+      };
     } catch (e: any) {
       app.log.error(e);
       await deleteChallenge(db, ch.id);

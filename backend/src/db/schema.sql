@@ -67,3 +67,20 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
 
 CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_expiresAt ON webauthn_challenges(expiresAt);
 CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_userId ON webauthn_challenges(userId);
+
+
+CREATE TABLE IF NOT EXISTS login_proofs (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  resolutionId TEXT NOT NULL,
+  createdAt INTEGER NOT NULL,
+  expiresAt INTEGER NOT NULL,
+  usedAt INTEGER,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (resolutionId) REFERENCES qr_resolutions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_proofs_expiresAt ON login_proofs(expiresAt);
+CREATE INDEX IF NOT EXISTS idx_login_proofs_usedAt ON login_proofs(usedAt);
+CREATE INDEX IF NOT EXISTS idx_login_proofs_userId ON login_proofs(userId);
+CREATE INDEX IF NOT EXISTS idx_login_proofs_resolutionId ON login_proofs(resolutionId);

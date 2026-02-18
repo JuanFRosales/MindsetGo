@@ -53,10 +53,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script>
+// Päivitetty tila sisältämään proofId
 let state = {
   qrId: null,
   resolutionId: null,
-  userId: null
+  userId: null,
+  proofId: null
 };
 
 const fetchJson = async (url, init) => {
@@ -64,7 +66,7 @@ const fetchJson = async (url, init) => {
   const text = await res.text();
   let json;
   try { json = JSON.parse(text); } catch { json = { raw: text }; }
-  if (!res.ok) throw new Error(text);
+  if (!res.ok) throw new Error(json.error || json.details || text);
   return json;
 };
 
@@ -130,16 +132,16 @@ async function scanQr() {
 
 async function registerPasskey() {
   try {
-    const { challengeId, options } = await fetchJson("/webauthn/register/options", {
+    const { challengeId, publicKey } = await fetchJson("/webauthn/register/options", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ resolutionId: state.resolutionId })
     });
 
-    options.challenge = b64uToBuf(options.challenge);
-    options.user.id = b64uToBuf(options.user.id);
+    publicKey.challenge = b64uToBuf(publicKey.challenge);
+    publicKey.user.id = b64uToBuf(publicKey.user.id);
 
-    const cred = await navigator.credentials.create({ publicKey: options });
+    const cred = await navigator.credentials.create({ publicKey });
     const rawId = bufToB64u(cred.rawId);
 
     const payload = {
@@ -168,21 +170,21 @@ async function registerPasskey() {
 
 async function loginPasskey() {
   try {
-    const { challengeId, options } = await fetchJson("/webauthn/login/options", {
+    const { challengeId, publicKey } = await fetchJson("/webauthn/login/options", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ userId: state.userId })
     });
 
-    options.challenge = b64uToBuf(options.challenge);
-    if (options.allowCredentials) {
-      options.allowCredentials = options.allowCredentials.map(c => ({
+    publicKey.challenge = b64uToBuf(publicKey.challenge);
+    if (publicKey.allowCredentials) {
+      publicKey.allowCredentials = publicKey.allowCredentials.map(c => ({
         ...c,
         id: b64uToBuf(c.id)
       }));
     }
 
-    const cred = await navigator.credentials.get({ publicKey: options });
+    const cred = await navigator.credentials.get({ publicKey });
     const rawId = bufToB64u(cred.rawId);
 
     const resp = {
@@ -195,33 +197,35 @@ async function loginPasskey() {
       resp.userHandle = bufToB64u(cred.response.userHandle);
     }
 
-    const payload = {
-      challengeId,
-      response: {
-        id: rawId,
-        rawId,
-        type: cred.type,
-        response: resp,
-        clientExtensionResults: cred.getClientExtensionResults()
-      }
-    };
-
+    // A) Lisätty resolutionId bodyyn ja B) tallennetaan proofId vastauksesta
     const res = await fetchJson("/webauthn/login/verify", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        challengeId,
+        resolutionId: state.resolutionId,
+        response: {
+          id: rawId,
+          rawId,
+          type: cred.type,
+          response: resp,
+          clientExtensionResults: cred.getClientExtensionResults()
+        }
+      })
     });
 
+    state.proofId = res.proofId;
     log("loginOut", res);
   } catch (e) { logError("loginOut", e); }
 }
 
 async function createSession() {
   try {
+    // C) Lähetetään proofId session luomiseksi
     const res = await fetchJson("/auth/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ resolutionId: state.resolutionId, qrId: state.qrId })
+      body: JSON.stringify({ proofId: state.proofId })
     });
     log("sessionOut", res);
   } catch (e) { logError("sessionOut", e); }

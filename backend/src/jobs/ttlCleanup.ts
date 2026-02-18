@@ -3,63 +3,65 @@ import type { FastifyInstance } from "fastify";
 import { env } from "../config/env.js";
 import { getDb } from "../db/sqlite.js";
 
-// Helper functions to get current time and calculate past time
 const nowMs = (): number => Date.now();
-const hoursAgoMs = (h: number): number => nowMs() - h * 60 * 60 * 1000;
+const hoursToMs = (h: number): number => h * 60 * 60 * 1000;
 
-// Run TTL cleanup for sessions, invite codes, and users
-export const runTtlCleanup = async (app?: FastifyInstance): Promise<{
-  deletedSessions: number;
-  deletedInvitesExpired: number;
-  deletedInvitesUsed: number;
-  deletedUsers: number;
-  deletedQrResolutions: number;
-}> => {
+export const runTtlCleanup = async (app?: FastifyInstance): Promise<any> => {
   const db = await getDb();
   const now = nowMs();
-  
 
-  const retentionHours = (env as any).inviteUsedRetentionHours ?? 24;
-  const usedCutoff = hoursAgoMs(retentionHours);
+  // Retention settings
+  const inviteRetention = (env as any).usedRetentionHoursInviteCodes ?? 24;
+  const proofRetention = (env as any).usedRetentionHoursLoginProofs ?? 1;
+  const qrLinkRetentionHours = (env as any).qrLinkRetentionHours ?? 24 * 14;
 
+  // 1. Delete expired records, children first
+  const p1 = await db.run("DELETE FROM login_proofs WHERE expiresAt <= ?", now);
+  const w1 = await db.run("DELETE FROM webauthn_challenges WHERE expiresAt <= ?", now);
   const s1 = await db.run("DELETE FROM sessions WHERE expiresAt <= ?", now);
+  const r1 = await db.run("DELETE FROM qr_resolutions WHERE expiresAt <= ?", now);
   const i1 = await db.run("DELETE FROM invite_codes WHERE expiresAt <= ?", now);
-  const i2 = await db.run(
-    "DELETE FROM invite_codes WHERE usedAt IS NOT NULL AND usedAt <= ?",
-    usedCutoff
+
+  // qr_links does not have expiresAt, so prune by lastSeenAt retention
+  const ql1 = await db.run(
+    "DELETE FROM qr_links WHERE lastSeenAt <= ?",
+    now - hoursToMs(qrLinkRetentionHours),
   );
 
-  const r1 = await db.run("DELETE FROM qr_resolutions WHERE expiresAt <= ?", now);
-  const u1 = await db.run("DELETE FROM users WHERE expiresAt <= ?", now);
+  // 2. Delete used records after retention
+  const i2 = await db.run(
+    "DELETE FROM invite_codes WHERE usedAt IS NOT NULL AND usedAt <= ?",
+    now - hoursToMs(inviteRetention),
+  );
+  const p2 = await db.run(
+    "DELETE FROM login_proofs WHERE usedAt IS NOT NULL AND usedAt <= ?",
+    now - hoursToMs(proofRetention),
+  );
 
   const result = {
     deletedSessions: s1.changes ?? 0,
     deletedInvitesExpired: i1.changes ?? 0,
     deletedInvitesUsed: i2.changes ?? 0,
-    deletedUsers: u1.changes ?? 0,
     deletedQrResolutions: r1.changes ?? 0,
+    deletedQrLinks: ql1.changes ?? 0,
+    deletedLoginProofsExpired: p1.changes ?? 0,
+    deletedLoginProofsUsed: p2.changes ?? 0,
+    deletedWebAuthnChallenges: w1.changes ?? 0,
   };
 
   if (app) {
     app.log.info({ result }, "ttl cleanup done");
   }
-  
+
   return result;
 };
 
-// Register the TTL cleanup job with the Fastify instance
 export const registerTtlCleanupJob = (app: FastifyInstance): void => {
-
   const ttlEnabled = (env as any).ttlEnabled ?? true;
-  const ttlCron = (env as any).ttlCron ?? "0 * * * *"; // Default: every hour
+  const ttlCron = (env as any).ttlCron ?? "0 * * * *";
 
   if (!ttlEnabled) {
     app.log.info("ttl cleanup disabled");
-    return;
-  }
-
-  if (!cron.validate(ttlCron)) {
-    app.log.error({ ttlCron }, "invalid ttl cron");
     return;
   }
 
