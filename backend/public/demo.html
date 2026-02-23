@@ -1,259 +1,410 @@
 <!doctype html>
-<html lang="fi">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Backend demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Backend Flow Tester</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; }
-    h2 { border-top: 1px solid #ccc; padding-top: 20px; margin-top: 30px; }
-    button { margin: 4px 0; padding: 8px 12px; cursor: pointer; background: #eee; border: 1px solid #999; border-radius: 4px; }
-    button:hover { background: #ddd; }
-    input { width: 100%; padding: 8px; box-sizing: border-box; margin-top: 5px; }
-    pre { background: #f4f4f4; padding: 12px; overflow-x: auto; border-radius: 4px; min-height: 1.2em; border: 1px solid #ddd; }
-    .row { margin-bottom: 15px; }
-    .error { color: #d32f2f; background: #ffebee; border-color: #ffcdd2; }
-    canvas { background: #fff; margin-top: 10px; border: 1px solid #eee; }
+    :root { color-scheme: light; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+    h1 { margin: 0 0 12px; }
+    h2 { border-top: 1px solid #ddd; padding-top: 18px; margin-top: 22px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .row { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+    .row > * { flex: 1; }
+    label { font-size: 12px; color: #444; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #bbb; border-radius: 8px; }
+    button { padding: 10px 12px; cursor: pointer; background: #f2f2f2; border: 1px solid #999; border-radius: 8px; }
+    button:hover { background: #e9e9e9; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    pre { background: #f6f6f6; padding: 12px; overflow-x: auto; border-radius: 10px; border: 1px solid #e2e2e2; margin: 10px 0 0; }
+    .pill { display: inline-block; padding: 2px 8px; border: 1px solid #bbb; border-radius: 999px; font-size: 12px; background: #fafafa; }
+    .bad { border-color: #e53935; background: #ffebee; }
+    .muted { color: #666; }
+    .split { display:flex; gap: 14px; align-items:flex-start; }
+    #qrCanvas { border: 1px solid #e2e2e2; border-radius: 10px; background: #fff; padding: 10px; display: inline-block; min-width: 200px; min-height: 200px; }
+    .small { font-size: 12px; }
+    .actions { display:flex; flex-wrap: wrap; gap: 8px; }
+    .divider { height: 1px; background:#eee; margin: 10px 0; }
+    .right { text-align: right; }
   </style>
 </head>
 <body>
 
-<h1>Backend demo</h1>
+<h1>Backend Flow Tester</h1>
+<div class="muted small">All calls use relative fetches to the same origin.</div>
 
-<h2>1 Invite</h2>
-<button onclick="createInvite()">Create invite</button>
-<pre id="inviteOut"></pre>
+<div class="grid">
+  <div class="card">
+    <h2>Inputs</h2>
+    <div class="row">
+      <div>
+        <label>Admin key</label>
+        <input id="adminKey" value="dev-admin-key" />
+      </div>
+      <div>
+        <label>Invite code</label>
+        <input id="inviteCode" placeholder="Paste or create invite" />
+      </div>
+    </div>
 
-<h2>2 QR</h2>
-<button onclick="newQr()">Generate QR</button>
-<div class="row"><strong>qrId:</strong> <span id="id-display">-</span></div>
-<canvas id="qr"></canvas>
+    <div class="row">
+      <div>
+        <label>QR payload type</label>
+        <select id="qrPayloadMode" style="width:100%;padding:10px;border:1px solid #bbb;border-radius:8px;">
+          <option value="json">JSON { qrId }</option>
+          <option value="url">URL demo hash</option>
+        </select>
+      </div>
+      <div class="right">
+        <label>&nbsp;</label>
+        <button onclick="resetState()">Reset state</button>
+      </div>
+    </div>
 
-<h2>3 QR scan</h2>
-<input id="inviteInput" placeholder="Invite code" />
-<button onclick="scanQr()">Scan QR</button>
-<pre id="scanOut"></pre>
+    <div class="divider"></div>
 
-<h2>4 Passkey registration</h2>
-<button onclick="registerPasskey()">Register passkey</button>
-<pre id="registerOut"></pre>
+    <h2>State</h2>
+    <pre id="stateOut" class="mono">{}</pre>
+  </div>
 
-<h2>5 Passkey login</h2>
-<button onclick="loginPasskey()">Login with passkey</button>
-<pre id="loginOut"></pre>
+  <div class="card">
+    <h2>QR</h2>
+    <div class="split">
+      <div>
+        <div id="qrCanvas"></div>
+      </div>
+      <div style="flex:1;">
+        <div class="small"><span class="pill">qrId</span> <span id="qrIdText" class="mono">null</span></div>
+        <div class="small" style="margin-top:10px;"><span class="pill">payload</span></div>
+        <pre id="qrPayloadText" class="mono" style="min-height: 90px;">null</pre>
+        <div class="actions">
+          <button id="btnNewQr" onclick="newQr()">Generate QR</button>
+          <button id="btnScanQr" onclick="scanQr()">Scan QR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-<h2>6 Session</h2>
-<button onclick="createSession()">Create session</button>
-<button onclick="me()">Auth me</button>
-<button onclick="logout()">Logout</button>
-<pre id="sessionOut"></pre>
+<div class="grid" style="margin-top:18px;">
+  <div class="card">
+    <h2>Auth & Passkey</h2>
+    <div class="actions">
+      <button id="btnCreateInvite" onclick="createInvite()">Create invite</button>
+      <button id="btnRegisterPasskey" onclick="registerPasskey()">Register passkey</button>
+      <button id="btnLoginPasskey" onclick="loginPasskey()">Login passkey</button>
+      <button id="btnCreateSession" onclick="createSession()">Create session</button>
+      <button id="btnMe" onclick="me()">Auth me</button>
+      <button id="btnLogout" onclick="logout()">Logout</button>
+    </div>
+    <pre id="mainOut" class="mono"></pre>
+  </div>
 
-<h2>7 Admin</h2>
-<button onclick="cleanup()">Run TTL cleanup</button>
-<pre id="adminOut"></pre>
+  <div class="card">
+    <h2>Admin</h2>
+    <div class="actions">
+      <button id="btnDbCounts" onclick="dbCounts()">DB counts</button>
+      <button id="btnExpireTest" onclick="expireTestData()">Expire test data</button>
+      <button id="btnCleanup" onclick="cleanup()">Run TTL cleanup</button>
+      <button id="btnClearPasskeys" onclick="clearPasskeys()">Admin clear passkeys</button>
+    </div>
+    <pre id="adminOut" class="mono"></pre>
+  </div>
+</div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<div class="card" style="margin-top:18px;">
+  <h2>Log</h2>
+  <pre id="logOut" class="mono" style="min-height: 180px;"></pre>
+</div>
+
+<script src="/vendor/qrcode.min.js"></script>
+
 <script>
-// Päivitetty tila sisältämään proofId
-let state = {
-  qrId: null,
-  resolutionId: null,
-  userId: null,
-  proofId: null
-};
+  let state = {
+    qrId: null,
+    resolutionId: null,
+    userId: null,
+    proofId: null,
+    last: null
+  };
 
-const fetchJson = async (url, init) => {
-  const res = await fetch(url, init);
-  const text = await res.text();
-  let json;
-  try { json = JSON.parse(text); } catch { json = { raw: text }; }
-  if (!res.ok) throw new Error(json.error || json.details || text);
-  return json;
-};
+  const getAdminKey = () => document.getElementById("adminKey").value.trim();
+  const setInviteCode = (v) => document.getElementById("inviteCode").value = v || "";
+  const getInviteCode = () => document.getElementById("inviteCode").value.trim();
 
-const padB64 = s => s + "=".repeat((4 - s.length % 4) % 4);
+  function renderState() {
+    document.getElementById("stateOut").textContent = JSON.stringify(state, null, 2);
+    document.getElementById("qrIdText").textContent = state.qrId || "null";
+    updateButtons();
+  }
 
-const b64uToBuf = s => {
-  const b64 = padB64(s.replace(/-/g, "+").replace(/_/g, "/"));
-  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-};
+  function updateButtons() {
+    const hasAdmin = !!getAdminKey();
+    document.getElementById("btnCreateInvite").disabled = !hasAdmin;
+    document.getElementById("btnDbCounts").disabled = !hasAdmin;
+    document.getElementById("btnExpireTest").disabled = !hasAdmin;
+    document.getElementById("btnCleanup").disabled = !hasAdmin;
+    document.getElementById("btnClearPasskeys").disabled = !hasAdmin;
+    document.getElementById("btnScanQr").disabled = !state.qrId;
+    document.getElementById("btnRegisterPasskey").disabled = !state.resolutionId;
+    document.getElementById("btnLoginPasskey").disabled = !state.userId || !state.resolutionId;
+    document.getElementById("btnCreateSession").disabled = !state.proofId;
+  }
 
-const bufToB64u = b => {
-  const u8 = b instanceof ArrayBuffer ? new Uint8Array(b) : new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
-  return btoa(String.fromCharCode(...u8))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-};
+  // WebAuthn helpers
+  const padB64 = s => s + "=".repeat((4 - s.length % 4) % 4);
+  const b64uToBuf = s => {
+    const b64 = padB64(s.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  };
+  const bufToB64u = b => {
+    const u8 = b instanceof ArrayBuffer ? new Uint8Array(b) : new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+    return btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
 
-const log = (id, obj) => {
-  const el = document.getElementById(id);
-  el.classList.remove("error");
-  el.textContent = JSON.stringify(obj, null, 2);
-};
+  function stamp() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  }
 
-const logError = (id, err) => {
-  const el = document.getElementById(id);
-  el.classList.add("error");
-  el.textContent = err.message || String(err);
-};
+  function appendLog(entry) {
+    const el = document.getElementById("logOut");
+    el.textContent += (el.textContent ? "\n\n" : "") + entry;
+    el.scrollTop = el.scrollHeight;
+  }
 
-async function createInvite() {
-  try {
-    const j = await fetchJson("/invites", {
-      method: "POST",
-      headers: { "x-admin-key": "dev-admin-key" }
+  async function fetchAny(url, init) {
+    const method = (init && init.method) ? init.method : "GET";
+    try {
+      const res = await fetch(url, init);
+      const text = await res.text();
+      let json; try { json = JSON.parse(text); } catch { json = { raw: text }; }
+      appendLog(`[${stamp()}] ${method} ${url}\nstatus: ${res.status}\nresponse: ${JSON.stringify(json, null, 2)}`);
+      return { ok: res.ok, status: res.status, json };
+    } catch (e) {
+      appendLog(`[${stamp()}] ${method} ${url} ERROR: ${e.message}`);
+      return { ok: false, json: { error: e.message } };
+    }
+  }
+
+  function showMain(obj, isError) {
+    const el = document.getElementById("mainOut");
+    el.textContent = JSON.stringify(obj, null, 2);
+    el.className = "mono " + (isError ? "bad" : "");
+  }
+
+  function qrPayloadForId(qrId) {
+    if (document.getElementById("qrPayloadMode").value === "url") {
+      const u = new URL(window.location.href); u.hash = `qrId=${encodeURIComponent(qrId)}`;
+      return u.toString();
+    }
+    return JSON.stringify({ qrId });
+  }
+
+  async function setQrVisual(qrId) {
+    const payload = qrPayloadForId(qrId);
+    document.getElementById("qrPayloadText").textContent = payload;
+    
+    const container = document.getElementById("qrCanvas");
+    // Clean nodes for Safari compatibility
+    while (container.firstChild) container.removeChild(container.firstChild);
+
+    if (typeof QRCode === "undefined") {
+      appendLog("ERROR: QRCode library not found at /vendor/qrcode.min.js");
+      return;
+    }
+
+    new QRCode(container, {
+      text: payload,
+      width: 200,
+      height: 200,
+      correctLevel: QRCode.CorrectLevel.H
     });
-    document.getElementById("inviteInput").value = j.code;
-    log("inviteOut", j);
-  } catch (e) { logError("inviteOut", e); }
-}
+  }
 
-async function newQr() {
-  state.qrId = crypto.randomUUID();
-  document.getElementById("id-display").textContent = state.qrId;
-  await QRCode.toCanvas(document.getElementById("qr"), JSON.stringify({ qrId: state.qrId }));
-}
+  function resetState() {
+    state = { qrId: null, resolutionId: null, userId: null, proofId: null, last: null };
+    document.getElementById("mainOut").textContent = "";
+    document.getElementById("logOut").textContent = "";
+    const container = document.getElementById("qrCanvas");
+    while (container.firstChild) container.removeChild(container.firstChild);
+    renderState();
+  }
 
-async function scanQr() {
-  try {
-    const inviteCode = document.getElementById("inviteInput").value.trim();
-    const body = inviteCode ? { qrId: state.qrId, inviteCode } : { qrId: state.qrId };
-    const j = await fetchJson("/qr/scan", {
+  async function newQr() {
+    state.qrId = crypto.randomUUID();
+    renderState();
+    setQrVisual(state.qrId);
+  }
+
+  async function scanQr() {
+    const r = await fetchAny("/qr/scan", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ qrId: state.qrId, inviteCode: getInviteCode() })
     });
-    state.resolutionId = j.resolutionId;
-    state.userId = j.userId;
-    log("scanOut", j);
-  } catch (e) { logError("scanOut", e); }
-}
+    if (r.ok) {
+      state.resolutionId = r.json.resolutionId;
+      state.userId = r.json.userId || state.userId;
+      renderState();
+    }
+    showMain(r.json, !r.ok);
+  }
 
-async function registerPasskey() {
-  try {
-    const { challengeId, publicKey } = await fetchJson("/webauthn/register/options", {
+  async function registerPasskey() {
+    const r1 = await fetchAny("/webauthn/register/options", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ resolutionId: state.resolutionId })
     });
+    if (!r1.ok) return showMain(r1.json, true);
 
-    publicKey.challenge = b64uToBuf(publicKey.challenge);
-    publicKey.user.id = b64uToBuf(publicKey.user.id);
+    const pk = r1.json.publicKey;
+    pk.challenge = b64uToBuf(pk.challenge);
+    pk.user.id = b64uToBuf(pk.user.id);
 
-    const cred = await navigator.credentials.create({ publicKey });
-    const rawId = bufToB64u(cred.rawId);
+    try {
+      const cred = await navigator.credentials.create({ publicKey: pk });
+      const r2 = await fetchAny("/webauthn/register/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          challengeId: r1.json.challengeId,
+          response: {
+            id: cred.id,
+            rawId: bufToB64u(cred.rawId),
+            type: cred.type,
+            response: {
+              clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+              attestationObject: bufToB64u(cred.response.attestationObject)
+            }
+          }
+        })
+      });
+      showMain(r2.json, !r2.ok);
+    } catch (e) { showMain({ error: e.message }, true); }
+  }
 
-    const payload = {
-      challengeId,
-      response: {
-        id: rawId,
-        rawId,
-        type: cred.type,
-        response: {
-          clientDataJSON: bufToB64u(cred.response.clientDataJSON),
-          attestationObject: bufToB64u(cred.response.attestationObject)
-        },
-        clientExtensionResults: cred.getClientExtensionResults()
-      }
-    };
-
-    const res = await fetchJson("/webauthn/register/verify", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    log("registerOut", res);
-  } catch (e) { logError("registerOut", e); }
-}
-
-async function loginPasskey() {
-  try {
-    const { challengeId, publicKey } = await fetchJson("/webauthn/login/options", {
+  async function loginPasskey() {
+    const r1 = await fetchAny("/webauthn/login/options", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ userId: state.userId })
     });
+    if (!r1.ok) return showMain(r1.json, true);
 
-    publicKey.challenge = b64uToBuf(publicKey.challenge);
-    if (publicKey.allowCredentials) {
-      publicKey.allowCredentials = publicKey.allowCredentials.map(c => ({
-        ...c,
-        id: b64uToBuf(c.id)
-      }));
-    }
+    const pk = r1.json.publicKey;
+    pk.challenge = b64uToBuf(pk.challenge);
+    if (pk.allowCredentials) pk.allowCredentials.forEach(c => c.id = b64uToBuf(c.id));
 
-    const cred = await navigator.credentials.get({ publicKey });
-    const rawId = bufToB64u(cred.rawId);
+    try {
+      const cred = await navigator.credentials.get({ publicKey: pk });
+      const r2 = await fetchAny("/webauthn/login/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          challengeId: r1.json.challengeId,
+          resolutionId: state.resolutionId,
+          response: {
+            id: cred.id,
+            rawId: bufToB64u(cred.rawId),
+            response: {
+              clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+              authenticatorData: bufToB64u(cred.response.authenticatorData),
+              signature: bufToB64u(cred.response.signature),
+              userHandle: cred.response.userHandle ? bufToB64u(cred.response.userHandle) : null
+            }
+          }
+        })
+      });
+      if (r2.ok) { state.proofId = r2.json.proofId; renderState(); }
+      showMain(r2.json, !r2.ok);
+    } catch (e) { showMain({ error: e.message }, true); }
+  }
 
-    const resp = {
-      clientDataJSON: bufToB64u(cred.response.clientDataJSON),
-      authenticatorData: bufToB64u(cred.response.authenticatorData),
-      signature: bufToB64u(cred.response.signature)
-    };
-
-    if (cred.response.userHandle) {
-      resp.userHandle = bufToB64u(cred.response.userHandle);
-    }
-
-    // A) Lisätty resolutionId bodyyn ja B) tallennetaan proofId vastauksesta
-    const res = await fetchJson("/webauthn/login/verify", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        challengeId,
-        resolutionId: state.resolutionId,
-        response: {
-          id: rawId,
-          rawId,
-          type: cred.type,
-          response: resp,
-          clientExtensionResults: cred.getClientExtensionResults()
-        }
-      })
-    });
-
-    state.proofId = res.proofId;
-    log("loginOut", res);
-  } catch (e) { logError("loginOut", e); }
-}
-
-async function createSession() {
-  try {
-    // C) Lähetetään proofId session luomiseksi
-    const res = await fetchJson("/auth/session", {
+  async function createSession() {
+    const r = await fetchAny("/auth/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ proofId: state.proofId })
     });
-    log("sessionOut", res);
-  } catch (e) { logError("sessionOut", e); }
-}
+    showMain(r.json, !r.ok);
+  }
 
-async function me() {
-  try {
-    const res = await fetchJson("/auth/me");
-    log("sessionOut", res);
-  } catch (e) { logError("sessionOut", e); }
-}
-
-async function logout() {
-  try {
-    await fetchJson("/auth/logout", { method: "POST" });
-    log("sessionOut", { ok: true });
-  } catch (e) { logError("sessionOut", e); }
-}
-
-async function cleanup() {
-  try {
-    const res = await fetchJson("/admin/cleanup", {
-      method: "POST",
-      headers: { "x-admin-key": "dev-admin-key" }
+  // POST calls with empty body (maxProperties: 0)
+  async function createInvite() {
+    const r = await fetchAny("/invites", { 
+      method: "POST", 
+      headers: { "x-admin-key": getAdminKey() } 
     });
-    log("adminOut", res);
-  } catch (e) { logError("adminOut", e); }
-}
+    if (r.ok) setInviteCode(r.json.code);
+    showMain(r.json, !r.ok);
+  }
+
+  async function logout() { 
+    const r = await fetchAny("/auth/logout", { method: "POST" }); 
+    showMain({ ok: r.ok }, !r.ok); 
+  }
+
+  async function cleanup() {
+    const r = await fetchAny("/admin/cleanup", { 
+      method: "POST", 
+      headers: { "x-admin-key": getAdminKey() } 
+    });
+    document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2);
+  }
+
+  async function expireTestData() {
+    const r = await fetchAny("/admin/expire-test-data", { 
+      method: "POST", 
+      headers: { "x-admin-key": getAdminKey() } 
+    });
+    document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2);
+  }
+
+  // Standard GET calls
+  async function me() { const r = await fetchAny("/auth/me"); showMain(r.json, !r.ok); }
+  async function dbCounts() { const r = await fetchAny("/admin/db-counts", { headers: { "x-admin-key": getAdminKey() } }); document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2); }
+
+  // Admin clear passkeys (requires userId body)
+  async function clearPasskeys() {
+    const userId = state.userId;
+    if (!userId) {
+      appendLog(`[${stamp()}] Clear Passkeys: No userId in state`);
+      return;
+    }
+    try {
+      const r = await fetch("/admin/clear-passkeys", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-admin-key": getAdminKey()
+        },
+        body: JSON.stringify({ userId })
+      });
+      const json = await r.json();
+      appendLog(`[${stamp()}] POST /admin/clear-passkeys status: ${r.status}\nresponse: ${JSON.stringify(json, null, 2)}`);
+      
+      const adminOut = document.getElementById("adminOut");
+      adminOut.textContent = JSON.stringify(json, null, 2);
+      adminOut.className = r.ok ? "mono" : "mono bad";
+
+      if (r.ok) {
+        state.proofId = null;
+        renderState();
+      }
+    } catch (e) {
+      appendLog(`[${stamp()}] Clear Passkeys ERROR: ${e.message}`);
+    }
+  }
+
+  renderState();
 </script>
+
 </body>
 </html>

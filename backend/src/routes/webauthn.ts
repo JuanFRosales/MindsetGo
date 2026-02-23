@@ -1,30 +1,33 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Fido2Lib } from "fido2-lib";
 import { createHash } from "node:crypto";
-import { env } from "../config/env.js";
-import { getDb } from "../db/sqlite.js";
-import { getValidQrResolution } from "../models/qrResolutionRepo.js";
+import { env } from "../config/env.ts";
+import { getDb } from "../db/sqlite.ts";
+import { getValidQrResolution } from "../models/qrResolutionRepo.ts";
 import {
   createChallenge,
   getValidChallenge,
   deleteChallenge,
-} from "../models/webauthnChallengeRepo.js";
+} from "../models/webauthnChallengeRepo.ts";
 import {
   getPasskeyByUserId,
   upsertSinglePasskey,
   updateCounter,
-} from "../models/passkeyRepo.js";
-import { createLoginProof } from "../models/loginProofRepo.js"; 
+} from "../models/passkeyRepo.ts";
+import { createLoginProof } from "../models/loginProofRepo.ts";
+import { idString } from "../http/schemas.ts";
 
 const DASH = String.fromCharCode(45);
 
 // User ID is hashed to 32 bytes to create a stable identifier for the authenticator
 const userIdToBytes = (userId: string): Uint8Array =>
-  createHash("sha256").update(userId, "utf8").digest(); 
+  createHash("sha256").update(userId, "utf8").digest();
+
 const padB64 = (s: string): string => {
   const pad = (4 - (s.length % 4)) % 4;
   return s + "=".repeat(pad);
 };
+
 // Convert base64url string to ArrayBuffer
 const b64uToArrayBuffer = (s: string): ArrayBuffer => {
   const b64 = padB64(
@@ -65,262 +68,297 @@ const f2l = new Fido2Lib({
 
 // WebAuthn routes for registration and login
 export const webauthnRoutes: FastifyPluginAsync = async (app) => {
-  
-  app.post("/webauthn/register/options", async (req, reply) => {
-    const { resolutionId: rawId } = req.body as { resolutionId?: string };
-    const resolutionId = rawId?.trim();
-    if (!resolutionId) {
-      return reply.status(400).send({ error: "missing_resolutionId" });
-    }
 
-    const db = await getDb();
-    const resolution = await getValidQrResolution(db, resolutionId);
-    if (!resolution) {
-      return reply.status(400).send({ error: "invalid_resolutionId" });
-    }
-// Check if user already has a passkey
-    const existing = await getPasskeyByUserId(db, resolution.userId);
-    if (existing) {
-      return reply.status(409).send({ error: "passkey_already_exists" });
-    }
-
-    const base = await f2l.attestationOptions();
-
-    const options: any = {
-      ...base,
-      rp: { name: env.rpName, id: env.rpId },
-      user: {
-        id: bufLikeToB64u(userIdToBytes(resolution.userId)),
-        name: resolution.userId,
-        displayName: resolution.userId,
+  // Get registration options
+  app.post(
+    "/webauthn/register/options",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["resolutionId"],
+          additionalProperties: false,
+          properties: {
+            resolutionId: idString,
+          },
+        },
       },
-      challenge: bufLikeToB64u(base.challenge as any),
-      timeout: 60000,
-      attestation: "none",
-      authenticatorSelection: {
-        residentKey: "preferred",
-        userVerification: "preferred",
-      },
-    };
+    },
+    async (req, reply) => {
+      const { resolutionId: rawId } = req.body as { resolutionId: string };
+      const resolutionId = rawId.trim();
 
-    const ch = await createChallenge(
-      db,
-      resolution.userId,
-      "register",
-      options.challenge,
-      5,
-    );
+      const db = await getDb();
+      const resolution = await getValidQrResolution(db, resolutionId);
+      if (!resolution) {
+        return reply.status(400).send({ error: "invalid_resolutionId" });
+      }
 
-    return { challengeId: ch.id, publicKey: options };
-  });
+      const existing = await getPasskeyByUserId(db, resolution.userId);
+      if (existing) {
+        return reply.status(409).send({ error: "passkey_already_exists" });
+      }
+
+      const base = await f2l.attestationOptions();
+
+      const options: any = {
+        ...base,
+        rp: { name: env.rpName, id: env.rpId },
+        user: {
+          id: bufLikeToB64u(userIdToBytes(resolution.userId)),
+          name: resolution.userId,
+          displayName: resolution.userId,
+        },
+        challenge: bufLikeToB64u(base.challenge as any),
+        timeout: 60000,
+        attestation: "none",
+        authenticatorSelection: {
+          residentKey: "preferred",
+          userVerification: "preferred",
+        },
+      };
+
+      const ch = await createChallenge(
+        db,
+        resolution.userId,
+        "register",
+        options.challenge,
+        5,
+      );
+
+      return { challengeId: ch.id, publicKey: options };
+    },
+  );
 
   // Registration verification route
-  app.post("/webauthn/register/verify", async (req, reply) => {
-    const { challengeId: rawChId, response } = req.body as {
-      challengeId?: string;
-      response?: any;
-    };
-
-    const challengeId = rawChId?.trim();
-    if (!challengeId || !response) {
-      return reply.status(400).send({ error: "bad_request" });
-    }
-
-    const db = await getDb();
-    const ch = await getValidChallenge(db, challengeId, "register");
-    if (!ch) {
-      return reply.status(400).send({ error: "invalid_challenge" });
-    }
-// ensure the user still doesn't have a passkey
-    try {
-      if (!response.rawId) return reply.status(400).send({ error: "missing_rawId" });
-      if (!response.id) return reply.status(400).send({ error: "missing_id" });
-// Convert the response to format expected by fido2-lib
-      const attestationResponse: any = {
-        id: b64uToArrayBuffer(response.id),
-        rawId: b64uToArrayBuffer(response.rawId),
-        type: response.type,
-        response: {
-          clientDataJSON: b64uToArrayBuffer(response.response.clientDataJSON),
-          attestationObject: b64uToArrayBuffer(response.response.attestationObject),
+  app.post(
+    "/webauthn/register/verify",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["challengeId", "response"],
+          additionalProperties: false,
+          properties: {
+            challengeId: idString,
+            response: { type: "object" },
+          },
         },
-        clientExtensionResults: response.clientExtensionResults ?? {},
+      },
+    },
+    async (req, reply) => {
+      const { challengeId: rawChId, response } = req.body as {
+        challengeId: string;
+        response: any;
       };
 
-      const expected: any = {
-        challenge: b64uToArrayBuffer(ch.challenge),
-        origin: env.origin,
-        factor: "either",
-      };
-
-      const result: any = await f2l.attestationResult(attestationResponse, expected);
-      const authnrData: any = result.authnrData;
-
-      const credId: ArrayBuffer = authnrData.get("credId");
-      const publicKeyPem: string = authnrData.get("credentialPublicKeyPem");
-      const counter: number = Number(authnrData.get("counter") ?? 0);
-
-      await upsertSinglePasskey(db, {
-        userId: ch.userId,
-        credentialId: bufLikeToB64u(credId),
-        publicKey: publicKeyPem,
-        counter,
-        createdAt: Date.now(),
-      });
-
-      await deleteChallenge(db, ch.id);
-      return { ok: true, userId: ch.userId };
-    } catch (e: any) {
-      app.log.error(e);
-      await deleteChallenge(db, ch.id);
-      return reply
-        .status(500)
-        .send({ error: "registration_failed", details: e?.message ?? String(e) });
-    }
-  });
-
-  // Login routes based on user ID and QR resolution
-  app.post("/webauthn/login/options", async (req, reply) => {
-    const { userId: rawUserId } = req.body as { userId?: string };
-    const userId = rawUserId?.trim();
-    if (!userId) {
-      return reply.status(400).send({ error: "missing_userId" });
-    }
-
-    const db = await getDb();
-    const pk = await getPasskeyByUserId(db, userId);
-    if (!pk) {
-      return reply.status(404).send({ error: "no_passkey" });
-    }
-
-    const base = await f2l.assertionOptions();
-
-    const options: any = {
-      ...base,
-      challenge: bufLikeToB64u(base.challenge as any),
-      rpId: env.rpId,
-      timeout: 60000,
-      userVerification: "preferred",
-      allowCredentials: [
-        {
-          type: "public-key",
-          id: pk.credentialId,
-        },
-      ],
-    };
-
-    const ch = await createChallenge(db, userId, "login", options.challenge, 5);
-    return { challengeId: ch.id, publicKey: options };
-  });
-
-  // verify login response
-  app.post("/webauthn/login/verify", async (req, reply) => {
-    // Extract and validate input
-    const { 
-      challengeId: rawChId, 
-      resolutionId: rawResId, 
-      response 
-    } = req.body as {
-      challengeId?: string;
-      resolutionId?: string;
-      response?: any;
-    };
-
-    const challengeId = rawChId?.trim();
-    const resolutionId = rawResId?.trim();
-
-    // Validation
-    if (!challengeId || !resolutionId || !response) {
-      return reply.status(400).send({ error: "bad_request" });
-    }
-
-    const db = await getDb();
-    const ch = await getValidChallenge(db, challengeId, "login");
-    if (!ch) {
-      return reply.status(400).send({ error: "invalid_challenge" });
-    }
-
-    // Ensure the challenge is associated with the resolution and user
-    const resolution = await getValidQrResolution(db, resolutionId);
-    if (!resolution) {
-      await deleteChallenge(db, ch.id);
-      return reply.status(400).send({ error: "invalid_resolutionId" });
-    }
-
-    if (resolution.userId !== ch.userId) {
-      await deleteChallenge(db, ch.id);
-      return reply.status(400).send({ error: "resolution_user_mismatch" });
-    }
-
-    const pk = await getPasskeyByUserId(db, ch.userId);
-    if (!pk) {
-      await deleteChallenge(db, ch.id);
-      return reply.status(404).send({ error: "passkey_not_found_in_db" });
-    }
-
-    if (!isPem(pk.publicKey)) {
-      await deleteChallenge(db, ch.id);
-      return reply.status(409).send({
-        error: "passkey_needs_reregistration",
-        details: "Stored public key is not in PEM format. Delete passkey and register again.",
-      });
-    }
-// verify the assertion response using fido2-lib and handle the result
-    try {
-      if (!response.rawId) return reply.status(400).send({ error: "missing_rawId" });
-      if (!response.id) return reply.status(400).send({ error: "missing_id" });
-
-      const assertionResponse: any = {
-        id: b64uToArrayBuffer(response.id),
-        rawId: b64uToArrayBuffer(response.rawId),
-        type: response.type,
-        response: {
-          clientDataJSON: b64uToArrayBuffer(response.response.clientDataJSON),
-          authenticatorData: b64uToArrayBuffer(response.response.authenticatorData),
-          signature: b64uToArrayBuffer(response.response.signature),
-        },
-        clientExtensionResults: response.clientExtensionResults ?? {},
-      };
-
-      let userHandleAB: ArrayBuffer | undefined;
-      if (response.response.userHandle) {
-        userHandleAB = b64uToArrayBuffer(response.response.userHandle);
-        assertionResponse.response.userHandle = userHandleAB;
+      const challengeId = rawChId.trim();
+      const db = await getDb();
+      const ch = await getValidChallenge(db, challengeId, "register");
+      
+      if (!ch) {
+        return reply.status(400).send({ error: "invalid_challenge" });
       }
 
-      const expected: any = {
-        challenge: b64uToArrayBuffer(ch.challenge),
-        origin: env.origin,
-        factor: "either",
-        publicKey: pk.publicKey,
-        prevCounter: Number(pk.counter) || 0,
-      };
+      try {
+        if (!response.rawId) return reply.status(400).send({ error: "missing_rawId" });
+        if (!response.id) return reply.status(400).send({ error: "missing_id" });
 
-      if (userHandleAB) {
-        expected.userHandle = userHandleAB;
+        const attestationResponse: any = {
+          id: b64uToArrayBuffer(response.id),
+          rawId: b64uToArrayBuffer(response.rawId),
+          type: response.type,
+          response: {
+            clientDataJSON: b64uToArrayBuffer(response.response.clientDataJSON),
+            attestationObject: b64uToArrayBuffer(response.response.attestationObject),
+          },
+          clientExtensionResults: response.clientExtensionResults ?? {},
+        };
+
+        const expected: any = {
+          challenge: b64uToArrayBuffer(ch.challenge),
+          origin: env.origin,
+          factor: "either",
+        };
+
+        const result: any = await f2l.attestationResult(attestationResponse, expected);
+        const authnrData: any = result.authnrData;
+
+        const credId: ArrayBuffer = authnrData.get("credId");
+        const publicKeyPem: string = authnrData.get("credentialPublicKeyPem");
+        const counter: number = Number(authnrData.get("counter") ?? 0);
+
+        await upsertSinglePasskey(db, {
+          userId: ch.userId,
+          credentialId: bufLikeToB64u(credId),
+          publicKey: publicKeyPem,
+          counter,
+          createdAt: Date.now(),
+        });
+
+        await deleteChallenge(db, ch.id);
+        return { ok: true, userId: ch.userId };
+      } catch (e: any) {
+        app.log.error({ msg: e?.message ?? String(e) }, "webauthn_register_verify_failed");
+        await deleteChallenge(db, ch.id);
+        return reply.status(500).send({ error: "registration_failed" });
+      }
+    },
+  );
+
+  // Login options route
+  app.post(
+    "/webauthn/login/options",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["userId"],
+          additionalProperties: false,
+          properties: {
+            userId: idString,
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { userId: rawUserId } = req.body as { userId: string };
+      const userId = rawUserId.trim();
+
+      const db = await getDb();
+      const pk = await getPasskeyByUserId(db, userId);
+      if (!pk) {
+        return reply.status(404).send({ error: "no_passkey" });
       }
 
-      const result: any = await f2l.assertionResult(assertionResponse, expected);
-      const authnrData: any = result.authnrData;
+      const base = await f2l.assertionOptions();
 
-      const newCounter: number = Number(authnrData.get("counter") ?? 0);
-      await updateCounter(db, ch.userId, newCounter);
-
-      // Create a login proof that client can exchange for a session, then clean up the challenge
-      const proof = await createLoginProof(db, ch.userId, resolutionId, 5);
-      await deleteChallenge(db, ch.id);
-
-      return { 
-        ok: true, 
-        userId: ch.userId, 
-        proofId: proof.id 
+      const options: any = {
+        ...base,
+        challenge: bufLikeToB64u(base.challenge as any),
+        rpId: env.rpId,
+        timeout: 60000,
+        userVerification: "preferred",
+        allowCredentials: [
+          {
+            type: "public-key",
+            id: pk.credentialId,
+          },
+        ],
       };
-    } catch (e: any) {
-      app.log.error(e);
-      await deleteChallenge(db, ch.id);
-      return reply
-        .status(500)
-        .send({ error: "verification_failed", details: e?.message ?? String(e) });
-    }
-  });
+
+      const ch = await createChallenge(db, userId, "login", options.challenge, 5);
+      return { challengeId: ch.id, publicKey: options };
+    },
+  );
+
+  // Login verification route
+  app.post(
+    "/webauthn/login/verify",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["challengeId", "resolutionId", "response"],
+          additionalProperties: false,
+          properties: {
+            challengeId: idString,
+            resolutionId: idString,
+            response: { type: "object" },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const {
+        challengeId: rawChId,
+        resolutionId: rawResId,
+        response,
+      } = req.body as {
+        challengeId: string;
+        resolutionId: string;
+        response: any;
+      };
+
+      const challengeId = rawChId.trim();
+      const resolutionId = rawResId.trim();
+
+      const db = await getDb();
+      const ch = await getValidChallenge(db, challengeId, "login");
+      if (!ch) {
+        return reply.status(400).send({ error: "invalid_challenge" });
+      }
+
+      try {
+        const resolution = await getValidQrResolution(db, resolutionId);
+        if (!resolution) {
+          await deleteChallenge(db, ch.id);
+          return reply.status(400).send({ error: "invalid_resolutionId" });
+        }
+
+        if (resolution.userId !== ch.userId) {
+          await deleteChallenge(db, ch.id);
+          return reply.status(400).send({ error: "resolution_user_mismatch" });
+        }
+
+        const pk = await getPasskeyByUserId(db, ch.userId);
+        if (!pk) {
+          await deleteChallenge(db, ch.id);
+          return reply.status(404).send({ error: "passkey_not_found_in_db" });
+        }
+
+        if (!isPem(pk.publicKey)) {
+          await deleteChallenge(db, ch.id);
+          // 409 Conflict - Requires user action (re-registration)
+          return reply.status(409).send({ error: "passkey_needs_reregistration" });
+        }
+
+        if (!response.rawId || !response.id) {
+          await deleteChallenge(db, ch.id);
+          return reply.status(400).send({ error: "missing_credential_id" });
+        }
+
+        const assertionResponse: any = {
+          id: b64uToArrayBuffer(response.id),
+          rawId: b64uToArrayBuffer(response.rawId),
+          type: response.type,
+          response: {
+            clientDataJSON: b64uToArrayBuffer(response.response.clientDataJSON),
+            authenticatorData: b64uToArrayBuffer(response.response.authenticatorData),
+            signature: b64uToArrayBuffer(response.response.signature),
+          },
+          clientExtensionResults: response.clientExtensionResults ?? {},
+        };
+
+        if (response.response.userHandle) {
+          assertionResponse.response.userHandle = b64uToArrayBuffer(response.response.userHandle);
+        }
+
+        const expected: any = {
+          challenge: b64uToArrayBuffer(ch.challenge),
+          origin: env.origin,
+          factor: "either",
+          publicKey: pk.publicKey,
+          prevCounter: Number(pk.counter) || 0,
+        };
+
+        if (assertionResponse.response.userHandle) {
+          expected.userHandle = assertionResponse.response.userHandle;
+        }
+
+        const result: any = await f2l.assertionResult(assertionResponse, expected);
+        const newCounter: number = Number(result.authnrData.get("counter") ?? 0);
+        
+        await updateCounter(db, ch.userId, newCounter);
+        const proof = await createLoginProof(db, ch.userId, resolutionId, 5);
+        await deleteChallenge(db, ch.id);
+
+        return { ok: true, userId: ch.userId, proofId: proof.id };
+      } catch (e: any) {
+        app.log.error({ msg: e?.message ?? String(e) }, "webauthn_login_verify_failed");
+        await deleteChallenge(db, ch.id);
+        return reply.status(500).send({ error: "verification_failed" });
+      }
+    },
+  );
 };

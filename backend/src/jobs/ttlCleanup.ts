@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import type { FastifyInstance } from "fastify";
-import { env } from "../config/env.js";
-import { getDb } from "../db/sqlite.js";
+import { env } from "../config/env.ts";
+import { getDb } from "../db/sqlite.ts";
 
 const nowMs = (): number => Date.now();
 const hoursToMs = (h: number): number => h * 60 * 60 * 1000;
@@ -50,7 +50,19 @@ export const runTtlCleanup = async (app?: FastifyInstance): Promise<any> => {
   };
 
   if (app) {
-    app.log.info({ result }, "ttl cleanup done");
+   app.log.info(
+  {
+    deletedSessions: result.deletedSessions,
+    deletedInvitesExpired: result.deletedInvitesExpired,
+    deletedInvitesUsed: result.deletedInvitesUsed,
+    deletedQrResolutions: result.deletedQrResolutions,
+    deletedQrLinks: result.deletedQrLinks,
+    deletedLoginProofsExpired: result.deletedLoginProofsExpired,
+    deletedLoginProofsUsed: result.deletedLoginProofsUsed,
+    deletedWebAuthnChallenges: result.deletedWebAuthnChallenges,
+  },
+  "ttl_cleanup_done",
+);
   }
 
   return result;

@@ -11,9 +11,6 @@ import { webauthnRoutes } from "./routes/webauthn.ts";
 import staticPlugin from "@fastify/static";
 import { join } from "node:path";
 
-
-
-
 export const buildApp = () => {
   const app = Fastify({
     logger: {
@@ -21,16 +18,42 @@ export const buildApp = () => {
         process.env.NODE_ENV === "development"
           ? { target: "pino-pretty" }
           : undefined,
+      // Redact sensitive information from logs
+      redact: {
+        paths: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          "req.headers['x-admin-key']",
+          "req.body",          // Redact entire request body
+          "req.query",         // Redact all query parameters
+          "req.params",        // Redact all URL parameters
+          "res.headers['set-cookie']" // Redact outgoing cookies
+        ],
+        censor: "***" // Mask value
+      }
     },
   });
+
+  // Global hook to prevent validation errors when body is missing
+  app.addHook("preValidation", (req, _reply, done) => {
+    const m = req.method;
+    if (
+      (m === "POST" || m === "PUT" || m === "PATCH" || m === "DELETE") && 
+      req.body === undefined
+    ) {
+      (req as any).body = {};
+    }
+    done();
+  });
+
   // Static files
   app.register(staticPlugin, {
-  root: join(process.cwd(), "public"),
-  prefix: "/"
-});
-
+    root: join(process.cwd(), "public"),
+    prefix: "/"
+  });
 
   app.register(cookie);
+  
   // Error handling
   registerErrorHandler(app);
   registerSessionAuth(app);

@@ -1,41 +1,106 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/sqlite.ts";
-import { createUser, deleteUser, getUserById, listUsers, touchUser } from "../models/userRepo.ts";
+import {
+  createUser,
+  deleteUser,
+  getUserById,
+  listUsers,
+  touchUser,
+} from "../models/userRepo.ts";
+import { emptyBodySchema, idString } from "../http/schemas.ts";
 
 export const userRoutes = async (app: FastifyInstance): Promise<void> => {
-  app.post("/users", async () => {
+  
+  // Create a new user
+  // Uses emptyBodySchema - works with empty POST requests thanks to preValidation hook
+  app.post("/users", { schema: { body: emptyBodySchema } }, async () => {
     const db = await getDb();
     const user = await createUser(db);
     return user;
   });
 
-  app.get("/users", async (req) => {
-    const db = await getDb();
-    const q = req.query as { limit?: string };
-    const limit = q.limit ? Number(q.limit) : 50;
-    return await listUsers(db, Number.isFinite(limit) ? limit : 50);
-  });
+  // List users with optional limit
+  app.get(
+    "/users",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          properties: {
+            limit: { type: "string", pattern: "^[0-9]+$" },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const q = (req.query ?? {}) as Record<string, any>;
 
-  app.get("/users/:id", async (req, reply) => {
-    const db = await getDb();
-    const { id } = req.params as { id: string };
+      // Strict check: forbid unknown query parameters
+      const allowed = new Set(["limit"]);
+      for (const k of Object.keys(q)) {
+        if (!allowed.has(k)) {
+          return reply.status(400).send({ error: "bad_request" });
+        }
+      }
 
-    const user = await getUserById(db, id);
-    if (!user) return reply.status(404).send({ error: "not_found" });
+      const db = await getDb();
+      const n = q.limit ? Number(q.limit) : 50;
+      const limit = Number.isFinite(n) ? Math.min(Math.max(n, 1), 200) : 50;
+      
+      return await listUsers(db, limit);
+    },
+  );
 
-    await touchUser(db, id);
+  // Get single user and update last seen (touch)
+  app.get(
+    "/users/:id",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          additionalProperties: false,
+          properties: { id: idString },
+        },
+      },
+    },
+    async (req, reply) => {
+      const db = await getDb();
+      const { id } = req.params as { id: string };
 
-    const updated = await getUserById(db, id);
-    return updated ?? user;
-  });
+      const user = await getUserById(db, id);
+      if (!user) return reply.status(404).send({ error: "not_found" });
 
-  app.delete("/users/:id", async (req, reply) => {
-    const db = await getDb();
-    const { id } = req.params as { id: string };
+      // Update activity timestamp
+      await touchUser(db, id);
 
-    const ok = await deleteUser(db, id);
-    if (!ok) return reply.status(404).send({ error: "not_found" });
+      // Return the fresh state after touch
+      const updated = await getUserById(db, id);
+      return updated ?? user;
+    },
+  );
 
-    return reply.status(204).send();
-  });
+  // Delete user - returns 204 on success
+  app.delete(
+    "/users/:id",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          additionalProperties: false,
+          properties: { id: idString },
+        },
+      },
+    },
+    async (req, reply) => {
+      const db = await getDb();
+      const { id } = req.params as { id: string };
+
+      const ok = await deleteUser(db, id);
+      if (!ok) return reply.status(404).send({ error: "not_found" });
+
+      return reply.status(204).send();
+    },
+  );
 };
