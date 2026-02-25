@@ -10,13 +10,15 @@ const num = (key: string, fallback: string, min?: number): number => {
   const raw = requireEnv(key, fallback);
   const n = Number(raw);
   if (!Number.isFinite(n)) throw new Error(`Env ${key} must be a number`);
-  if (min !== undefined && n < min) throw new Error(`Env ${key} must be >= ${min}`);
+  if (min !== undefined && n < min)
+    throw new Error(`Env ${key} must be >= ${min}`);
   return n;
 };
 
 const bool = (key: string, fallback: "true" | "false" = "false"): boolean => {
   const raw = (process.env[key] ?? fallback).toLowerCase();
-  if (raw !== "true" && raw !== "false") throw new Error(`Env ${key} must be true or false`);
+  if (raw !== "true" && raw !== "false")
+    throw new Error(`Env ${key} must be true or false`);
   return raw === "true";
 };
 
@@ -33,8 +35,16 @@ export const env = {
   ttlEnabled: bool("TTL_ENABLED", "true"),
 
   // Retention for used records
-  usedRetentionHoursInviteCodes: num("USED_RETENTION_HOURS_INVITE_CODES", "24", 0),
-  usedRetentionHoursLoginProofs: num("USED_RETENTION_HOURS_LOGIN_PROOFS", "24", 0),
+  usedRetentionHoursInviteCodes: num(
+    "USED_RETENTION_HOURS_INVITE_CODES",
+    "24",
+    0,
+  ),
+  usedRetentionHoursLoginProofs: num(
+    "USED_RETENTION_HOURS_LOGIN_PROOFS",
+    "24",
+    0,
+  ),
 
   // TTL Settings
   userTtlDays: num("USER_TTL_DAYS", "14", 0),
@@ -51,4 +61,14 @@ export const env = {
   rpId: requireEnv("RP_ID", "localhost"),
   rpName: requireEnv("RP_NAME", "Backend demo"),
   origin: requireEnv("ORIGIN", "http://localhost:3000"),
+
+  // AI
+  aiMode: requireEnv("AI_MODE", "stub"),
+  aiBaseUrl: process.env.AI_BASE_URL ?? "",
+  aiApiKey: process.env.AI_API_KEY ?? "",
+  aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1000),
+
+  // Chat retention
+  messageTtlDays: num("MESSAGE_TTL_DAYS", "14", 0),
+  messageContextLimit: num("MESSAGE_CONTEXT_LIMIT", "20", 1),
 };

@@ -21,8 +21,15 @@ export const runTtlCleanup = async (app?: FastifyInstance): Promise<any> => {
   const s1 = await db.run("DELETE FROM sessions WHERE expiresAt <= ?", now);
   const r1 = await db.run("DELETE FROM qr_resolutions WHERE expiresAt <= ?", now);
   const i1 = await db.run("DELETE FROM invite_codes WHERE expiresAt <= ?", now);
+  
+  // Delete expired messages
+  const m1 = await db.run("DELETE FROM messages WHERE expiresAt <= ?", now);
 
-  // qr_links does not have expiresAt, so prune by lastSeenAt retention
+  // Delete expired profile states and summaries
+  const ps1 = await db.run("DELETE FROM profile_state WHERE expiresAt <= ?", now);
+  const cs1 = await db.run("DELETE FROM conversation_summary WHERE expiresAt <= ?", now);
+
+  // Prune qr_links by lastSeenAt
   const ql1 = await db.run(
     "DELETE FROM qr_links WHERE lastSeenAt <= ?",
     now - hoursToMs(qrLinkRetentionHours),
@@ -47,22 +54,18 @@ export const runTtlCleanup = async (app?: FastifyInstance): Promise<any> => {
     deletedLoginProofsExpired: p1.changes ?? 0,
     deletedLoginProofsUsed: p2.changes ?? 0,
     deletedWebAuthnChallenges: w1.changes ?? 0,
+    deletedMessages: m1.changes ?? 0,
+    deletedProfileState: ps1.changes ?? 0,
+    deletedConversationSummary: cs1.changes ?? 0,
   };
 
   if (app) {
-   app.log.info(
-  {
-    deletedSessions: result.deletedSessions,
-    deletedInvitesExpired: result.deletedInvitesExpired,
-    deletedInvitesUsed: result.deletedInvitesUsed,
-    deletedQrResolutions: result.deletedQrResolutions,
-    deletedQrLinks: result.deletedQrLinks,
-    deletedLoginProofsExpired: result.deletedLoginProofsExpired,
-    deletedLoginProofsUsed: result.deletedLoginProofsUsed,
-    deletedWebAuthnChallenges: result.deletedWebAuthnChallenges,
-  },
-  "ttl_cleanup_done",
-);
+    app.log.info(
+      {
+        ...result,
+      },
+      "ttl_cleanup_done"
+    );
   }
 
   return result;
@@ -77,6 +80,7 @@ export const registerTtlCleanupJob = (app: FastifyInstance): void => {
     return;
   }
 
+  // Schedule physical deletion via node-cron
   cron.schedule(ttlCron, async () => {
     try {
       await runTtlCleanup(app);

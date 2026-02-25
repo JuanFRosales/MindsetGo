@@ -10,6 +10,7 @@ import { qrRoutes } from "./routes/qr.ts";
 import { webauthnRoutes } from "./routes/webauthn.ts";
 import staticPlugin from "@fastify/static";
 import { join } from "node:path";
+import { chatRoutes } from "./routes/chat.ts";
 
 export const buildApp = () => {
   const app = Fastify({
@@ -65,6 +66,7 @@ export const buildApp = () => {
   app.register(adminRoutes);
   app.register(qrRoutes);
   app.register(webauthnRoutes);
+  app.register(chatRoutes);
 
   return app;
 };
