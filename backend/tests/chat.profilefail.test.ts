@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { makeTestDbPath, loginWithInvite, waitFor } from "./helpers.ts";
 
-test("profile fail ei riko replytä", async () => {
+test("profile fail does not break reply", async () => {
   process.env.NODE_ENV = "test";
   process.env.DB_PATH = makeTestDbPath();
   process.env.ADMIN_KEY = "dev-admin-key";

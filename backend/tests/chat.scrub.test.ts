@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { makeTestDbPath, extractSetCookie, pickCookiePair } from "./helpers.ts";
 
-test("chat vaatii sessionin ja scrubbaa sisällön", async () => {
+test("chat requires session and scrubs content", async () => {
   process.env.NODE_ENV = "test";
   process.env.DB_PATH = makeTestDbPath();
   process.env.ADMIN_KEY = "dev-admin-key";

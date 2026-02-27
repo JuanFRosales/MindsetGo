@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { makeTestDbPath, extractSetCookie, pickCookiePair } from "./helpers.ts";
 
-test("ttl cleanup poistaa vanhentuneet rivit", async () => {
+test("ttl cleanup deletes expired rows", async () => {
   process.env.NODE_ENV = "test";
   process.env.DB_PATH = makeTestDbPath();
   process.env.ADMIN_KEY = "dev-admin-key";

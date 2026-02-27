@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { makeTestDbPath } from "./helpers.ts";
 
 // test to verify that /invites endpoint requires the correct admin key and does not allow unauthorized access
-test("invites vaatii admin keyn", async () => {
+test("invites requires admin key", async () => {
   process.env.NODE_ENV = "test";
   process.env.DB_PATH = makeTestDbPath();
   process.env.ADMIN_KEY = "dev-admin-key";

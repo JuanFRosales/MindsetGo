@@ -7,7 +7,7 @@ import { makeTestDbPath, extractSetCookie, pickCookiePair } from "./helpers.ts";
 // 2. Use the invite code to authenticate via QR code endpoint, which should create a session cookie
 // 3. Use the session cookie to call /auth/me and verify that it returns the authenticated user's info
 
-test("invite ja qr kirjautuminen luo session ja auth me toimii", async () => {
+test("invite and qr login works and returns authenticated user info", async () => {
   process.env.NODE_ENV = "test";
   process.env.DB_PATH = makeTestDbPath();
   process.env.ADMIN_KEY = "dev-admin-key";
