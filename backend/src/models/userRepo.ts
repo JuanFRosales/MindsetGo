@@ -6,6 +6,7 @@ const nowMs = (): number => Date.now();
 
 const daysFromNow = (days: number): number => nowMs() + days * 24 * 60 * 60 * 1000;
 
+// create a new user with default ttl
 export const createUser = async (db: Database, ttlDays: number = 14): Promise<User> => {
   const createdAt = nowMs();
   const user: User = {
@@ -26,6 +27,7 @@ export const createUser = async (db: Database, ttlDays: number = 14): Promise<Us
   return user;
 };
 
+// fetch a single user by id
 export const getUserById = async (db: Database, id: string): Promise<User | null> => {
   const row = await db.get<User>(
     "SELECT id, createdAt, lastActiveAt, expiresAt FROM users WHERE id = ?",
@@ -34,6 +36,7 @@ export const getUserById = async (db: Database, id: string): Promise<User | null
   return row ?? null;
 };
 
+// list users with a safe limit
 export const listUsers = async (db: Database, limit: number = 50): Promise<User[]> => {
   const safeLimit = Math.max(1, Math.min(200, limit));
   const rows = await db.all<User[]>(
@@ -43,12 +46,14 @@ export const listUsers = async (db: Database, limit: number = 50): Promise<User[
   return (rows as unknown as User[]) ?? [];
 };
 
+// update user activity timestamp
 export const touchUser = async (db: Database, id: string): Promise<void> => {
   const ts = nowMs();
   await db.run("UPDATE users SET lastActiveAt = ? WHERE id = ?", ts, id);
 };
 
-export const deleteUser = async (db: Database, id: string): Promise<boolean> => {
-  const res = await db.run("DELETE FROM users WHERE id = ?", id);
+// delete user by id and rely on database cascades for cleanup
+export const deleteUser = async (db: any, userId: string): Promise<boolean> => {
+  const res = await db.run("DELETE FROM users WHERE id = ?", userId);
   return (res.changes ?? 0) > 0;
 };

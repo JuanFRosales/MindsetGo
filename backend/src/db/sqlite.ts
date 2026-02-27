@@ -1,7 +1,7 @@
 import sqlite3 from "sqlite3";
 import { open, Database } from "sqlite";
 import path from "node:path";
-import { env } from "../config/env.js";
+import { env } from "../config/env.ts";
 
 // Cached promise to handle concurrent calls
 let dbPromise: Promise<Database> | null = null;

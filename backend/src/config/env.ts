@@ -23,18 +23,20 @@ const bool = (key: string, fallback: "true" | "false" = "false"): boolean => {
 };
 
 export const env = {
-  // Server and DB
+  // server and db
   isProd: (process.env.NODE_ENV ?? "development") === "production",
   port: num("PORT", "3000", 1),
   dbPath: requireEnv("DB_PATH", "./data/app.db"),
   adminKey: requireEnv("ADMIN_KEY", "dev-admin-key"),
   cookieName: requireEnv("COOKIE_NAME", "sid"),
+  // maximum allowed body size for incoming requests
+  maxRequestBytes: num("MAX_REQUEST_BYTES", "50000", 1000),
 
-  // Cleanup Job
+  // cleanup job
   ttlCron: process.env.TTL_CRON ?? "0 3 * * *",
   ttlEnabled: bool("TTL_ENABLED", "true"),
 
-  // Retention for used records
+  // retention for used records
   usedRetentionHoursInviteCodes: num(
     "USED_RETENTION_HOURS_INVITE_CODES",
     "24",
@@ -46,7 +48,7 @@ export const env = {
     0,
   ),
 
-  // TTL Settings
+  // ttl settings
   userTtlDays: num("USER_TTL_DAYS", "14", 0),
   inviteTtlHours: num("INVITE_TTL_HOURS", "24", 0),
   sessionTtlMinutes: num("SESSION_TTL_MINUTES", "60", 0),
@@ -57,18 +59,23 @@ export const env = {
 
   qrLinkRetentionHours: num("QR_LINK_RETENTION_HOURS", "336", 0),
 
-  // WebAuthn
+  // webauthn
   rpId: requireEnv("RP_ID", "localhost"),
   rpName: requireEnv("RP_NAME", "Backend demo"),
   origin: requireEnv("ORIGIN", "http://localhost:3000"),
 
-  // AI
+  // ai configuration
   aiMode: requireEnv("AI_MODE", "stub"),
   aiBaseUrl: process.env.AI_BASE_URL ?? "",
   aiApiKey: process.env.AI_API_KEY ?? "",
   aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1000),
 
-  // Chat retention
+  // chat retention and context
   messageTtlDays: num("MESSAGE_TTL_DAYS", "14", 0),
   messageContextLimit: num("MESSAGE_CONTEXT_LIMIT", "20", 1),
+
+  // ai testing flags
+  testSummaryFail: bool("TEST_SUMMARY_FAIL", "false"),
+  testProfileFail: bool("TEST_PROFILE_FAIL", "false"),
+  testProfilePii: bool("TEST_PROFILE_PII", "false"),
 };

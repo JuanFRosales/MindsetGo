@@ -7,6 +7,7 @@ export type AiMessage = {
 
 export type GenerateReplyInput = {
   requestId: string;
+  task?: AiTask;
   scrubbedMessage: string;
   context: AiMessage[];
   summary?: string;
@@ -19,3 +20,5 @@ export type GenerateReplyOutput = {
 export type AiProvider = {
   generateReply(input: GenerateReplyInput): Promise<GenerateReplyOutput>;
 };
+
+export type AiTask = "reply" | "summary" | "profile";
