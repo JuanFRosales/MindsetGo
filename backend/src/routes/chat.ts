@@ -82,7 +82,7 @@ export const chatRoutes = async (app: FastifyInstance): Promise<void> => {
         type: "object",
         required: ["message"],
         properties: {
-          message: { type: "string", minLength: 1, maxLength: 20000 },
+          message: { type: "string", minLength: 1, maxLength: env.chatMessageMaxLength },
           conversationId: { type: "string", maxLength: 120 },
         },
       },
@@ -213,8 +213,15 @@ export const chatRoutes = async (app: FastifyInstance): Promise<void> => {
     if (!userId) return reply.status(401).send({ error: "unauthorized" });
     const q = (req.query ?? {}) as any;
     const db = await getDb();
-    const rows = await listRecentMessages(db, userId, q.conversationId ?? "default", 50);
-    return rows.reverse().map(m => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
+    const rows = await listRecentMessages(db, userId, q.conversationId ?? "default", ctxLimit);
+    return rows
+      .reverse()
+      .map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: scrubText(m.content),
+        createdAt: m.createdAt,
+      }));
   });
 
   // get single message status
@@ -225,6 +232,11 @@ export const chatRoutes = async (app: FastifyInstance): Promise<void> => {
     const db = await getDb();
     const row = await getMessageById(db, userId, p.id);
     if (!row) return reply.status(404).send({ error: "not_found" });
-    return { id: row.id, role: row.role, content: row.content, createdAt: row.createdAt };
+    return {
+      id: row.id,
+      role: row.role,
+      content: scrubText(row.content),
+      createdAt: row.createdAt,
+    };
   });
 };

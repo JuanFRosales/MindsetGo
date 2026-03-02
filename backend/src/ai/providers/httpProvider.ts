@@ -1,12 +1,21 @@
 import type { AiProvider, GenerateReplyInput, GenerateReplyOutput } from "../types.ts";
 
-export const createHttpProvider = (opts: { baseUrl: string; apiKey?: string }): AiProvider => {
+export const createHttpProvider = (opts: {
+  baseUrl: string;
+  apiKey?: string;
+  timeoutMs: number;
+}): AiProvider => {
   return {
     async generateReply(input: GenerateReplyInput): Promise<GenerateReplyOutput> {
       const controller = new AbortController();
-      const timeoutMs = 15_000;
 
-      const t = setTimeout(() => controller.abort(), timeoutMs);
+      if (input.signal) {
+        if (input.signal.aborted) controller.abort();
+        else input.signal.addEventListener("abort", () => controller.abort(), { once: true });
+      }
+
+      const t = setTimeout(() => controller.abort(), opts.timeoutMs);
+
       try {
         const res = await fetch(`${opts.baseUrl}/generate-reply`, {
           method: "POST",
@@ -14,7 +23,7 @@ export const createHttpProvider = (opts: { baseUrl: string; apiKey?: string }): 
             "content-type": "application/json",
             ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}),
           },
-          body: JSON.stringify(input),
+          body: JSON.stringify({ ...input, signal: undefined }),
           signal: controller.signal,
         });
 

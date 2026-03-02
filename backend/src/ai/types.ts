@@ -7,10 +7,13 @@ export type AiMessage = {
 
 export type GenerateReplyInput = {
   requestId: string;
-  task?: AiTask;
+  task: AiTask;
   scrubbedMessage: string;
   context: AiMessage[];
+  reply?: string;
   summary?: string;
+  profile?: string;
+  signal?: AbortSignal;
 };
 
 export type GenerateReplyOutput = {

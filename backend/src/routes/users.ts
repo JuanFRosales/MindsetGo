@@ -36,7 +36,8 @@ export const userRoutes = async (app: FastifyInstance): Promise<void> => {
 
       return reply.status(200).send({ ok: true });
     } catch (e) {
-      app.log.error({ err: e, userId }, "self_delete_failed");
+      // do not log user ids or any request content
+      app.log.error({ err: e }, "self_delete_failed");
       return reply.status(500).send({ error: "internal_error" });
     }
   };

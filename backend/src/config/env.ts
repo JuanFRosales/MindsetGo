@@ -10,15 +10,17 @@ const num = (key: string, fallback: string, min?: number): number => {
   const raw = requireEnv(key, fallback);
   const n = Number(raw);
   if (!Number.isFinite(n)) throw new Error(`Env ${key} must be a number`);
-  if (min !== undefined && n < min)
+  if (min !== undefined && n < min) {
     throw new Error(`Env ${key} must be >= ${min}`);
+  }
   return n;
 };
 
 const bool = (key: string, fallback: "true" | "false" = "false"): boolean => {
   const raw = (process.env[key] ?? fallback).toLowerCase();
-  if (raw !== "true" && raw !== "false")
+  if (raw !== "true" && raw !== "false") {
     throw new Error(`Env ${key} must be true or false`);
+  }
   return raw === "true";
 };
 
@@ -29,8 +31,13 @@ export const env = {
   dbPath: requireEnv("DB_PATH", "./data/app.db"),
   adminKey: requireEnv("ADMIN_KEY", "dev-admin-key"),
   cookieName: requireEnv("COOKIE_NAME", "sid"),
+
   // maximum allowed body size for incoming requests
   maxRequestBytes: num("MAX_REQUEST_BYTES", "50000", 1000),
+
+  // rate limiting
+  rateLimitWindowMs: num("RATE_LIMIT_WINDOW_MS", "60000", 1000),
+  rateLimitMax: num("RATE_LIMIT_MAX", "60", 1),
 
   // cleanup job
   ttlCron: process.env.TTL_CRON ?? "0 3 * * *",
@@ -68,13 +75,16 @@ export const env = {
   aiMode: requireEnv("AI_MODE", "stub"),
   aiBaseUrl: process.env.AI_BASE_URL ?? "",
   aiApiKey: process.env.AI_API_KEY ?? "",
-  aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1000),
+aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1),
 
   // chat retention and context
   messageTtlDays: num("MESSAGE_TTL_DAYS", "14", 0),
   messageContextLimit: num("MESSAGE_CONTEXT_LIMIT", "20", 1),
+  chatMessageMaxLength: num("CHAT_MESSAGE_MAX_LENGTH", "20000", 1),
 
   // ai testing flags
+  testStubSleepMs: num("TEST_STUB_SLEEP_MS", "0", 0),
+  testReplyFail: bool("TEST_REPLY_FAIL", "false"),
   testSummaryFail: bool("TEST_SUMMARY_FAIL", "false"),
   testProfileFail: bool("TEST_PROFILE_FAIL", "false"),
   testProfilePii: bool("TEST_PROFILE_PII", "false"),
