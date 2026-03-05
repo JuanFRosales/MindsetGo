@@ -5,7 +5,6 @@ import type { EntityId, Timestamps, Expirable, ActivityTracked } from "../types/
 const nowMs = (): number => Date.now();
 const daysFromNow = (days: number): number => nowMs() + days * 24 * 60 * 60 * 1000;
 
-// Conversation summary data model and repository functions
 export type ConversationSummaryRow = {
   id: EntityId;
   userId: EntityId;
@@ -15,7 +14,6 @@ export type ConversationSummaryRow = {
   ActivityTracked &
   Expirable;
 
-// Upsert function to update or insert conversation summary for a user and conversation
 export const upsertConversationSummary = async (
   db: Database,
   input: { userId: EntityId; conversationId: EntityId; summaryText: string; ttlDays: number },
@@ -41,7 +39,6 @@ export const upsertConversationSummary = async (
   );
 };
 
-// Function to get conversation summary for a user and conversation
 export const getConversationSummary = async (
   db: Database,
   userId: EntityId,
@@ -57,4 +54,16 @@ export const getConversationSummary = async (
   );
 
   return (row as unknown as ConversationSummaryRow) ?? null;
+};
+
+export const deleteConversationSummary = async (
+  db: Database,
+  userId: EntityId,
+  conversationId: EntityId,
+): Promise<void> => {
+  await db.run(
+    "DELETE FROM conversation_summary WHERE userId = ? AND conversationId = ?",
+    userId,
+    conversationId,
+  );
 };

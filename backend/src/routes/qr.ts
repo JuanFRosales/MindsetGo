@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { env } from "../config/env.ts";
 import { getDb } from "../db/sqlite.ts";
 import { createUser } from "../models/userRepo.ts";
-import { getValidInvite, markInviteUsed } from "../models/inviteRepo.ts";
+import { getInviteForLogin, markInviteUsed } from "../models/inviteRepo.ts";
 import { createQrLink, getQrLink, touchQrLink } from "../models/qrRepo.ts";
 import { createQrResolution } from "../models/qrResolutionRepo.ts";
 import { idString } from "../http/schemas.ts";
@@ -12,74 +12,57 @@ type QrScanBody = {
   inviteCode?: string;
 };
 
-// QR code login route
 export const qrRoutes = async (app: FastifyInstance): Promise<void> => {
   app.post(
-  "/qr/scan",
-  {
-    schema: {
-      body: {
-        type: "object",
-        required: ["qrId"],
-        additionalProperties: false,
-        properties: {
-          qrId: idString,
-          inviteCode: idString,
+    "/qr/scan",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["qrId"],
+          additionalProperties: false,
+          properties: {
+            qrId: idString,
+            inviteCode: idString,
+          },
         },
       },
     },
-  },
-  async (req, reply) => {
-    const { qrId: rawQrId, inviteCode: rawInviteCode } = req.body as QrScanBody;
+    async (req, reply) => {
+      const { qrId: rawQrId, inviteCode: rawInviteCode } = req.body as QrScanBody;
 
-    if (!rawQrId) {
-      return reply.status(400).send({ error: "missing_qrId" });
-    }
+      if (!rawQrId) return reply.status(400).send({ error: "missing_qrId" });
 
-    const qrId = rawQrId.trim();
-    const inviteCode = rawInviteCode?.trim();
+      const qrId = rawQrId.trim();
+      const inviteCode = rawInviteCode?.trim();
 
-    const db = await getDb();
+      const db = await getDb();
 
-    // Check if QR link already exists
-    const existing = await getQrLink(db, qrId);
+      const existing = await getQrLink(db, qrId);
+      if (existing) {
+        await touchQrLink(db, qrId);
+        const resolution = await createQrResolution(db, qrId, existing.userId, 5);
+        return { userId: existing.userId, resolutionId: resolution.id, linked: true };
+      }
 
-    if (existing) {
-      await touchQrLink(db, qrId);
+      if (!inviteCode) return reply.status(400).send({ error: "missing_inviteCode" });
 
-      // Create a resolution instead of a session
-      const resolution = await createQrResolution(db, qrId, existing.userId, 5);
+      const invite = await getInviteForLogin(db, inviteCode);
+      if (!invite) return reply.status(400).send({ error: "invalid_inviteCode" });
 
-      return {
-        userId: existing.userId,
-        resolutionId: resolution.id,
-        linked: true,
-      };
-    }
+      let userId = invite.usedByUserId ?? null;
 
-    // If no existing link, an invite code is required to create a new user
-    if (!inviteCode) {
-      return reply.status(400).send({ error: "missing_inviteCode" });
-    }
+      if (!userId) {
+        const user = await createUser(db, env.userTtlDays);
+        userId = user.id;
+        await markInviteUsed(db, inviteCode, userId);
+      }
 
-    // Validate invite code and create new user and QR link
-    const invite = await getValidInvite(db, inviteCode);
-    if (!invite) {
-      return reply.status(400).send({ error: "invalid_inviteCode" });
-    }
+      await createQrLink(db, qrId, userId);
 
-    const user = await createUser(db, env.userTtlDays);
-    await markInviteUsed(db, inviteCode, user.id);
-    await createQrLink(db, qrId, user.id);
+      const resolution = await createQrResolution(db, qrId, userId, 5);
 
-    // Create a resolution for the new user
-    const resolution = await createQrResolution(db, qrId, user.id, 5);
-
-    return {
-      userId: user.id,
-      resolutionId: resolution.id,
-      linked: false,
-    };
-  }
+      return { userId, resolutionId: resolution.id, linked: false };
+    },
   );
 };

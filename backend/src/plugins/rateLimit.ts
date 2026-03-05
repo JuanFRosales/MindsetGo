@@ -8,7 +8,7 @@ type Entry = {
 
 export function rateLimitPlugin(app: FastifyInstance) {
   const windowMs = env.rateLimitWindowMs;
-  const max = env.rateLimitMax;
+  const defaultMax = env.rateLimitMax;
 
   const store = new Map<string, Entry>();
 
@@ -20,7 +20,25 @@ export function rateLimitPlugin(app: FastifyInstance) {
       (request.headers["x-forwarded-for"] as string) ||
       "unknown";
 
-    const key = sid ? `sid:${sid}` : `ip:${ip}`;
+    const baseKey = sid ? `sid:${sid}` : `ip:${ip}`;
+
+    const url = request.raw.url ?? "";
+
+    let max = defaultMax;
+
+    if (url.startsWith("/qr/scan")) {
+      max = 300;
+    }
+
+    if (url.startsWith("/auth/me")) {
+      max = 200;
+    }
+
+    if (url.startsWith("/webauthn/")) {
+      max = 150;
+    }
+
+    const key = `${baseKey}:${url.split("?")[0]}`;
 
     const now = Date.now();
     const entry = store.get(key);

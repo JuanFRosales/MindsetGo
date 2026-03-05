@@ -109,3 +109,29 @@ export const getMessageById = async (
 
   return (row as unknown as MessageRow) ?? null;
 };
+
+export const deleteMessageById = async (
+  db: Database,
+  userId: EntityId,
+  id: EntityId,
+): Promise<boolean> => {
+  const res = await db.run(
+    "DELETE FROM messages WHERE userId = ? AND id = ?",
+    userId,
+    id,
+  );
+
+  return (res?.changes ?? 0) > 0;
+};
+
+export const deleteConversationMessages = async (
+  db: Database,
+  userId: EntityId,
+  conversationId: EntityId,
+): Promise<void> => {
+  await db.run(
+    "DELETE FROM messages WHERE userId = ? AND conversationId = ?",
+    userId,
+    conversationId,
+  );
+};

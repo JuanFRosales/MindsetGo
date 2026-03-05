@@ -1,0 +1,73 @@
+.bg-root{
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(1200px 800px at 20% 10%, rgba(122, 209, 255, 0.65), transparent 60%),
+              radial-gradient(1000px 700px at 90% 20%, rgba(140, 255, 222, 0.55), transparent 60%),
+              radial-gradient(900px 700px at 40% 90%, rgba(190, 180, 255, 0.45), transparent 60%),
+              linear-gradient(180deg, rgba(30, 60, 70, 0.20), rgba(10, 20, 30, 0.35));
+}
+
+.bg-blob{
+  position: absolute;
+  width: 55vmax;
+  height: 55vmax;
+  border-radius: 999px;
+  filter: blur(48px) saturate(115%);
+  opacity: 0.85;
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+
+.bg-blob-a{
+  left: -15vmax;
+  top: -10vmax;
+  background: radial-gradient(circle at 30% 30%, rgba(140, 240, 255, 0.85), rgba(80, 170, 255, 0.10) 60%, transparent 70%);
+  animation: floatA 22s ease-in-out infinite;
+}
+
+.bg-blob-b{
+  right: -18vmax;
+  top: 4vmax;
+  background: radial-gradient(circle at 30% 30%, rgba(120, 255, 215, 0.80), rgba(90, 210, 200, 0.10) 60%, transparent 70%);
+  animation: floatB 26s ease-in-out infinite;
+}
+
+.bg-blob-c{
+  left: 8vmax;
+  bottom: -18vmax;
+  background: radial-gradient(circle at 35% 35%, rgba(210, 195, 255, 0.65), rgba(150, 140, 255, 0.08) 60%, transparent 70%);
+  animation: floatC 30s ease-in-out infinite;
+}
+
+.bg-vignette{
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(1200px 800px at 50% 30%, rgba(255,255,255,0.06), transparent 55%),
+              radial-gradient(1400px 900px at 50% 80%, rgba(0,0,0,0.35), transparent 60%);
+  pointer-events: none;
+}
+
+@keyframes floatA{
+  0%{ transform: translate3d(0,0,0) scale(1); }
+  50%{ transform: translate3d(10vmax, 7vmax, 0) scale(1.08); }
+  100%{ transform: translate3d(0,0,0) scale(1); }
+}
+
+@keyframes floatB{
+  0%{ transform: translate3d(0,0,0) scale(1.02); }
+  50%{ transform: translate3d(-12vmax, 10vmax, 0) scale(1.10); }
+  100%{ transform: translate3d(0,0,0) scale(1.02); }
+}
+
+@keyframes floatC{
+  0%{ transform: translate3d(0,0,0) scale(1); }
+  50%{ transform: translate3d(8vmax, -10vmax, 0) scale(1.06); }
+  100%{ transform: translate3d(0,0,0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .bg-blob{ animation: none; }
+}

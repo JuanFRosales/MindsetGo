@@ -4,7 +4,7 @@ import { getDb } from "../db/sqlite.ts";
 import { createUser, getUserById, touchUser } from "../models/userRepo.ts";
 import {
   createInvite,
-  getValidInvite,
+  getInviteForLogin,
   markInviteUsed,
 } from "../models/inviteRepo.ts";
 import { createSession, deleteSession } from "../models/sessionRepo.ts";
@@ -18,14 +18,9 @@ import {
 } from "../models/loginProofRepo.ts";
 import { emptyBodySchema, idString } from "../http/schemas.ts";
 
-// Check if in production for cookie settings
 const isProd = process.env.NODE_ENV === "production";
 
-// Require admin key in headers
-export const requireAdmin = (
-  req: FastifyRequest,
-  reply: FastifyReply,
-): boolean => {
+export const requireAdmin = (req: FastifyRequest, reply: FastifyReply): boolean => {
   const key = req.headers["x-admin-key"];
   if (key !== env.adminKey) {
     reply.status(401).send({ error: "unauthorized" });
@@ -34,21 +29,17 @@ export const requireAdmin = (
   return true;
 };
 
-// Authentication and invite routes
 export const authRoutes = async (app: FastifyInstance): Promise<void> => {
-  
-  // Helper to set session cookie with appropriate options
   const setSessionCookie = (reply: FastifyReply, sessionId: string) => {
     reply.setCookie(env.cookieName, sessionId, {
       httpOnly: true,
       sameSite: "lax",
       secure: isProd,
       path: "/",
-      maxAge: env.sessionTtlMinutes * 60, 
+      maxAge: env.sessionTtlMinutes * 60,
     });
   };
 
-  // Create a new invite code
   app.post(
     "/invites",
     { schema: { body: emptyBodySchema } },
@@ -62,7 +53,11 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
     },
   );
 
-  // Direct login with invite code
+  /**
+   * Kirjautuminen kutsukoodilla
+   * Jos koodi on jo liitetty käyttäjään, tehdään sessio samalle käyttäjälle
+   * Muuten luodaan uusi käyttäjä ja liitetään koodi siihen
+   */
   app.post(
     "/auth/qr",
     {
@@ -71,9 +66,7 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
           type: "object",
           required: ["code"],
           additionalProperties: false,
-          properties: {
-            code: idString,
-          },
+          properties: { code: idString },
         },
       },
     },
@@ -82,22 +75,26 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
       const code = rawCode.trim();
 
       const db = await getDb();
-      const invite = await getValidInvite(db, code);
-      if (!invite) {
-        return reply.status(400).send({ error: "invalid_code" });
+      const invite = await getInviteForLogin(db, code);
+      if (!invite) return reply.status(400).send({ error: "invalid_code" });
+
+      let userId = invite.usedByUserId ?? null;
+
+      if (!userId) {
+        const user = await createUser(db, env.userTtlDays);
+        userId = user.id;
+        await markInviteUsed(db, code, userId);
+      } else {
+        await touchUser(db, userId);
       }
 
-      const user = await createUser(db, env.userTtlDays);
-      await markInviteUsed(db, code, user.id);
-
-      const session = await createSession(db, user.id, env.sessionTtlMinutes);
+      const session = await createSession(db, userId, env.sessionTtlMinutes);
       setSessionCookie(reply, session.id);
 
-      return { userId: user.id, expiresAt: session.expiresAt };
+      return { userId, expiresAt: session.expiresAt };
     },
   );
 
-  // Exchange a QR resolution (login proof) for a session
   app.post(
     "/auth/session",
     {
@@ -106,9 +103,7 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
           type: "object",
           required: ["proofId"],
           additionalProperties: false,
-          properties: {
-            proofId: idString,
-          },
+          properties: { proofId: idString },
         },
       },
     },
@@ -119,9 +114,7 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
       const db = await getDb();
 
       const proof = await getValidLoginProof(db, proofId);
-      if (!proof) {
-        return reply.status(401).send({ error: "invalid_or_expired_proof" });
-      }
+      if (!proof) return reply.status(401).send({ error: "invalid_or_expired_proof" });
 
       const resolution = await getValidQrResolution(db, proof.resolutionId);
       if (!resolution || resolution.userId !== proof.userId) {
@@ -131,9 +124,7 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
       const session = await createSession(db, proof.userId, env.sessionTtlMinutes);
 
       const okUsed = await markLoginProofUsed(db, proofId);
-      if (!okUsed) {
-        return reply.status(409).send({ error: "proof_already_used" });
-      }
+      if (!okUsed) return reply.status(409).send({ error: "proof_already_used" });
 
       setSessionCookie(reply, session.id);
       await deleteQrResolution(db, resolution.id);
@@ -142,10 +133,6 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
     },
   );
 
-  /**
-   * Get current session user info.
-   * Uses req.currentUserId set by sessionAuth middleware.
-   */
   app.get("/auth/me", async (req, reply) => {
     const userId = req.currentUserId;
     if (!userId) return reply.status(401).send({ error: "unauthorized" });
@@ -154,14 +141,12 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
     const user = await getUserById(db, userId);
     if (!user) return reply.status(401).send({ error: "unauthorized" });
 
-    // Keep the user and session active
     await touchUser(db, userId);
     const updated = await getUserById(db, userId);
 
     return { user: updated ?? user };
   });
 
-  // Logout route - Idempotent removal
   app.post(
     "/auth/logout",
     { schema: { body: emptyBodySchema } },

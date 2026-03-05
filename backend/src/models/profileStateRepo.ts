@@ -12,7 +12,7 @@ export type ProfileStateRow = {
 } & Timestamps &
   ActivityTracked &
   Expirable;
-// Upsert function to update or insert profile state for a user
+
 export const upsertProfileState = async (
   db: Database,
   input: { userId: EntityId; stateJson: string; ttlDays: number },
@@ -35,7 +35,7 @@ export const upsertProfileState = async (
     daysFromNow(input.ttlDays),
   );
 };
-// Function to get profile state for a user 
+
 export const getProfileState = async (
   db: Database,
   userId: EntityId,
@@ -49,4 +49,11 @@ export const getProfileState = async (
   );
 
   return (row as unknown as ProfileStateRow) ?? null;
+};
+
+export const deleteProfileState = async (
+  db: Database,
+  userId: EntityId,
+): Promise<void> => {
+  await db.run("DELETE FROM profile_state WHERE userId = ?", userId);
 };
