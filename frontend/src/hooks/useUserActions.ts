@@ -13,31 +13,40 @@ export const useUserActions = () => {
 
   const logout = useCallback(async () => {
     try {
+      // Best effort server logout
       await api.post("/auth/logout", {});
     } catch {
-      // ignore
+      // Ignore logout API errors
     } finally {
+      // Always clear local state
       auth.clear();
       qrIdStore.clear();
-      window.location.assign("/");
+      // Navigate home via router
+      nav("/", { replace: true });
     }
-  }, [auth]);
+  }, [auth, nav]);
 
   const deleteUser = useCallback(async () => {
     if (!confirm("Poistetaanko käyttäjä ja kaikki tiedot tältä laitteelta?")) return;
 
     try {
+      // Delete on server first
       await api.post("/user/delete", {});
-    } catch (e) {
-      toast.show(prettyApiError(e as ApiError));
-    } finally {
+      // Clear local state after successful deletion
       auth.clear();
       qrIdStore.clear();
-      window.location.assign("/");
+      // Optional success feedback
+      toast.show("Poistettu");
+      // Navigate home via router
+      nav("/", { replace: true });
+    } catch (e) {
+      // Keep user in place if deletion fails
+      toast.show(prettyApiError(e as ApiError));
     }
-  }, [auth, toast]);
+  }, [auth, nav, toast]);
 
   const goProfile = useCallback(() => {
+    // Simple route navigation
     nav("/profile");
   }, [nav]);
 

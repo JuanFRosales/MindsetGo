@@ -55,8 +55,7 @@
       <div>
         <label>QR payload type</label>
         <select id="qrPayloadMode" style="width:100%;padding:10px;border:1px solid #bbb;border-radius:8px;">
-          <option value="json">JSON { qrId }</option>
-          <option value="url">URL demo hash</option>
+          <option value="plain">Plain invite code</option>
         </select>
       </div>
       <div class="right">
@@ -155,7 +154,6 @@
     document.getElementById("btnCreateSession").disabled = !state.proofId;
   }
 
-  // WebAuthn helpers
   const padB64 = s => s + "=".repeat((4 - s.length % 4) % 4);
   const b64uToBuf = s => {
     const b64 = padB64(s.replace(/-/g, "+").replace(/_/g, "/"));
@@ -199,19 +197,14 @@
   }
 
   function qrPayloadForId(qrId) {
-    if (document.getElementById("qrPayloadMode").value === "url") {
-      const u = new URL(window.location.href); u.hash = `qrId=${encodeURIComponent(qrId)}`;
-      return u.toString();
-    }
-    return JSON.stringify({ qrId });
+    return String(qrId || "");
   }
 
   async function setQrVisual(qrId) {
     const payload = qrPayloadForId(qrId);
     document.getElementById("qrPayloadText").textContent = payload;
-    
+
     const container = document.getElementById("qrCanvas");
-    // Clean nodes for Safari compatibility
     while (container.firstChild) container.removeChild(container.firstChild);
 
     if (typeof QRCode === "undefined") {
@@ -237,7 +230,22 @@
   }
 
   async function newQr() {
-    state.qrId = crypto.randomUUID();
+    let code = getInviteCode();
+
+    if (!code) {
+      const r = await fetchAny("/invites", {
+        method: "POST",
+        headers: { "x-admin-key": getAdminKey() }
+      });
+      if (!r.ok) {
+        showMain(r.json, true);
+        return;
+      }
+      code = r.json.code;
+      setInviteCode(code);
+    }
+
+    state.qrId = code;
     renderState();
     setQrVisual(state.qrId);
   }
@@ -246,7 +254,7 @@
     const r = await fetchAny("/qr/scan", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ qrId: state.qrId, inviteCode: getInviteCode() })
+      body: JSON.stringify({ qrId: state.qrId })
     });
     if (r.ok) {
       state.resolutionId = r.json.resolutionId;
@@ -336,42 +344,42 @@
     showMain(r.json, !r.ok);
   }
 
-  // POST calls with empty body (maxProperties: 0)
   async function createInvite() {
-    const r = await fetchAny("/invites", { 
-      method: "POST", 
-      headers: { "x-admin-key": getAdminKey() } 
+    const r = await fetchAny("/invites", {
+      method: "POST",
+      headers: { "x-admin-key": getAdminKey() }
     });
     if (r.ok) setInviteCode(r.json.code);
     showMain(r.json, !r.ok);
   }
 
-  async function logout() { 
-    const r = await fetchAny("/auth/logout", { method: "POST" }); 
-    showMain({ ok: r.ok }, !r.ok); 
+  async function logout() {
+    const r = await fetchAny("/auth/logout", { method: "POST" });
+    showMain({ ok: r.ok }, !r.ok);
   }
 
   async function cleanup() {
-    const r = await fetchAny("/admin/cleanup", { 
-      method: "POST", 
-      headers: { "x-admin-key": getAdminKey() } 
+    const r = await fetchAny("/admin/cleanup", {
+      method: "POST",
+      headers: { "x-admin-key": getAdminKey() }
     });
     document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2);
   }
 
   async function expireTestData() {
-    const r = await fetchAny("/admin/expire-test-data", { 
-      method: "POST", 
-      headers: { "x-admin-key": getAdminKey() } 
+    const r = await fetchAny("/admin/expire-test-data", {
+      method: "POST",
+      headers: { "x-admin-key": getAdminKey() }
     });
     document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2);
   }
 
-  // Standard GET calls
   async function me() { const r = await fetchAny("/auth/me"); showMain(r.json, !r.ok); }
-  async function dbCounts() { const r = await fetchAny("/admin/db-counts", { headers: { "x-admin-key": getAdminKey() } }); document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2); }
+  async function dbCounts() {
+    const r = await fetchAny("/admin/db-counts", { headers: { "x-admin-key": getAdminKey() } });
+    document.getElementById("adminOut").textContent = JSON.stringify(r.json, null, 2);
+  }
 
-  // Admin clear passkeys (requires userId body)
   async function clearPasskeys() {
     const userId = state.userId;
     if (!userId) {
@@ -389,7 +397,7 @@
       });
       const json = await r.json();
       appendLog(`[${stamp()}] POST /admin/clear-passkeys status: ${r.status}\nresponse: ${JSON.stringify(json, null, 2)}`);
-      
+
       const adminOut = document.getElementById("adminOut");
       adminOut.textContent = JSON.stringify(json, null, 2);
       adminOut.className = r.ok ? "mono" : "mono bad";

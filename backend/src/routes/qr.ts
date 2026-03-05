@@ -34,7 +34,7 @@ export const qrRoutes = async (app: FastifyInstance): Promise<void> => {
       if (!rawQrId) return reply.status(400).send({ error: "missing_qrId" });
 
       const qrId = rawQrId.trim();
-      const inviteCode = rawInviteCode?.trim();
+      const inviteCode = rawInviteCode?.trim() ?? qrId;
 
       const db = await getDb();
 
@@ -45,7 +45,6 @@ export const qrRoutes = async (app: FastifyInstance): Promise<void> => {
         return { userId: existing.userId, resolutionId: resolution.id, linked: true };
       }
 
-      if (!inviteCode) return reply.status(400).send({ error: "missing_inviteCode" });
 
       const invite = await getInviteForLogin(db, inviteCode);
       if (!invite) return reply.status(400).send({ error: "invalid_inviteCode" });

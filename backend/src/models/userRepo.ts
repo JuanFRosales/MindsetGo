@@ -54,6 +54,16 @@ export const touchUser = async (db: Database, id: string): Promise<void> => {
 
 // delete user by id and rely on database cascades for cleanup
 export const deleteUser = async (db: any, userId: string): Promise<boolean> => {
-  const res = await db.run("DELETE FROM users WHERE id = ?", userId);
-  return (res.changes ?? 0) > 0;
+  await db.exec("BEGIN IMMEDIATE;");
+  try {
+    await db.run("UPDATE invite_codes SET usedByUserId = NULL WHERE usedByUserId = ?", userId);
+
+    const res = await db.run("DELETE FROM users WHERE id = ?", userId);
+
+    await db.exec("COMMIT;");
+    return (res.changes ?? 0) > 0;
+  } catch (e) {
+    await db.exec("ROLLBACK;");
+    throw e;
+  }
 };

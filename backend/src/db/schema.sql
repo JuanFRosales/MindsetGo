@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS invite_codes (
   expiresAt INTEGER NOT NULL,
   usedAt INTEGER,
   usedByUserId TEXT,
-  FOREIGN KEY (usedByUserId) REFERENCES users(id)
+  -- Lisätty ON DELETE SET NULL jotta historiatieto säilyy vaikka käyttäjä poistettaisiin
+  FOREIGN KEY (usedByUserId) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_invite_codes_expiresAt ON invite_codes(expiresAt);
@@ -21,7 +22,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions(userId);
 CREATE INDEX IF NOT EXISTS idx_sessions_expiresAt ON sessions(expiresAt);
 
-
 CREATE TABLE IF NOT EXISTS qr_links (
   qrId TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS qr_links (
 
 CREATE INDEX IF NOT EXISTS idx_qr_links_userId ON qr_links(userId);
 CREATE INDEX IF NOT EXISTS idx_qr_links_lastSeenAt ON qr_links(lastSeenAt);
-
 
 CREATE TABLE IF NOT EXISTS qr_resolutions (
   id TEXT PRIMARY KEY,
@@ -67,7 +66,6 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
 
 CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_expiresAt ON webauthn_challenges(expiresAt);
 CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_userId ON webauthn_challenges(userId);
-
 
 CREATE TABLE IF NOT EXISTS login_proofs (
   id TEXT PRIMARY KEY,
