@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { Background } from "./components/Background";
+import Background from "./components/Background";
 import { StartPage } from "./pages/StartPage";
 import { PasskeyPage } from "./pages/PasskeyPage";
 import { ChatPage } from "./pages/ChatPage";

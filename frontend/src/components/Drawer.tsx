@@ -7,7 +7,7 @@ type Props = {
   onClose: () => void;
   children: React.ReactNode;
 };
-
+// Drawer component for displaying a side menu with an overlay, using framer-motion for animations and handling keyboard events for accessibility.
 export const Drawer: React.FC<Props> = ({ open, title, onClose, children }) => {
   useEffect(() => {
     if (!open) return;
@@ -22,7 +22,7 @@ export const Drawer: React.FC<Props> = ({ open, title, onClose, children }) => {
     <AnimatePresence>
       {open && (
         <>
-          {/* Taustan himmennys animaatiolla */}
+          {/* fade-in and fade-out background */}
           <motion.div
             className="drawer-overlay"
             initial={{ opacity: 0 }}
@@ -31,7 +31,7 @@ export const Drawer: React.FC<Props> = ({ open, title, onClose, children }) => {
             onClick={onClose}
           />
 
-          {/* Valikkopaneeli ease-in liu'ulla */}
+          {/* drawer with ease-in and ease-out animation  */}
           <motion.div
             className="drawer"
             role="dialog"

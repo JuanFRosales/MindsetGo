@@ -7,7 +7,7 @@ type Props = {
 };
 
 type ScanState = "idle" | "starting" | "running" | "unsupported" | "denied" | "failed";
-
+// QrScannerModal component for scanning QR codes using the BarcodeDetector API, with error handling and user feedback for different states of the scanning process.
 export const QrScannerModal: React.FC<Props> = ({ open, onClose, onCode }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -35,7 +35,7 @@ export const QrScannerModal: React.FC<Props> = ({ open, onClose, onCode }) => {
       streamRef.current = null;
     }
   };
-
+// Effect hook to manage the lifecycle of the QR code scanning process, starting the camera and barcode detection when the modal is opened, and cleaning up resources when closed or when errors occur.
   useEffect(() => {
     if (!open) {
       stopAll();
@@ -52,6 +52,7 @@ export const QrScannerModal: React.FC<Props> = ({ open, onClose, onCode }) => {
 
     let cancelled = false;
 
+    // Start the camera and scanning process
     const start = async () => {
       setState("starting");
       setNote("");
@@ -76,7 +77,7 @@ export const QrScannerModal: React.FC<Props> = ({ open, onClose, onCode }) => {
 
         setState("running");
         setNote("Näytä koodi kameralle.");
-
+// Animation loop to continuously scan for QR codes in the video stream
         const tick = async () => {
           try {
             if (!videoRef.current) return;
