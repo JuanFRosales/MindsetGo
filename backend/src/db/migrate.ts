@@ -5,11 +5,13 @@ import { getDb } from "./sqlite.ts";
 
 type MigrationRow = { version: string };
 
+// Setup paths for ES modules compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const migrationsDir = path.resolve(__dirname, "../../migrations");
 
+// Create migration tracking table if it doesn't exist
 const ensureMigrationsTable = async () => {
   const db = await getDb();
   await db.exec(`
@@ -20,6 +22,7 @@ const ensureMigrationsTable = async () => {
   `);
 };
 
+// Retrieve and sort all .sql files from migrations directory
 const listSqlFiles = async (): Promise<string[]> => {
   const entries = await fs.readdir(migrationsDir, { withFileTypes: true });
   return entries
@@ -28,6 +31,7 @@ const listSqlFiles = async (): Promise<string[]> => {
     .sort();
 };
 
+// Fetch versions already applied to the database
 const getAppliedVersions = async (): Promise<Set<string>> => {
   const db = await getDb();
   const rows = (await db.all(
@@ -36,12 +40,14 @@ const getAppliedVersions = async (): Promise<Set<string>> => {
   return new Set(rows.map((r) => r.version));
 };
 
+// Execute a single migration file within a transaction
 const applyOne = async (filename: string) => {
   const db = await getDb();
   const full = path.join(migrationsDir, filename);
   const sql = await fs.readFile(full, "utf8");
   const now = Date.now();
 
+  // Ensure foreign key constraints are enforced
   await db.exec("PRAGMA foreign_keys = ON;");
 
   await db.exec("BEGIN;");
@@ -54,17 +60,20 @@ const applyOne = async (filename: string) => {
     );
     await db.exec("COMMIT;");
   } catch (e) {
+    // Revert changes if the migration fails
     await db.exec("ROLLBACK;");
     throw e;
   }
 };
 
+// Orchestrate the migration process by applying pending files
 export const migrate = async (): Promise<{ applied: string[] }> => {
   await ensureMigrationsTable();
 
   const files = await listSqlFiles();
   const applied = await getAppliedVersions();
 
+  // Filter and execute migrations that have not been run yet
   const toApply = files.filter((f) => !applied.has(f));
   for (const f of toApply) {
     await applyOne(f);

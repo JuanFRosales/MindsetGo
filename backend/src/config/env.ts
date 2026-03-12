@@ -1,11 +1,13 @@
 import "dotenv/config";
 
+// Validates and requires an environment variable
 const requireEnv = (key: string, fallback?: string): string => {
   const v = process.env[key] ?? fallback;
   if (!v) throw new Error(`Missing env ${key}`);
   return v;
 };
 
+// Validates and converts an environment variable to a number
 const num = (key: string, fallback: string, min?: number): number => {
   const raw = requireEnv(key, fallback);
   const n = Number(raw);
@@ -16,6 +18,7 @@ const num = (key: string, fallback: string, min?: number): number => {
   return n;
 };
 
+// Validates and converts an environment variable to a boolean
 const bool = (key: string, fallback: "true" | "false" = "false"): boolean => {
   const raw = (process.env[key] ?? fallback).toLowerCase();
   if (raw !== "true" && raw !== "false") {
@@ -25,67 +28,55 @@ const bool = (key: string, fallback: "true" | "false" = "false"): boolean => {
 };
 
 export const env = {
-  // server and db
+  // Server and database
   isProd: (process.env.NODE_ENV ?? "development") === "production",
   port: num("PORT", "3000", 1),
   dbPath: requireEnv("DB_PATH", "./data/app.db"),
   adminKey: requireEnv("ADMIN_KEY", "dev-admin-key"),
   
-  // cookies
+  // Cookies
   cookieName: requireEnv("COOKIE_NAME", "sid"),
-  adminCookieName: requireEnv("ADMIN_COOKIE_NAME", "admin_sid"), // New variable added here
+  adminCookieName: requireEnv("ADMIN_COOKIE_NAME", "admin_sid"),
 
-  // maximum allowed body size for incoming requests
+  // Security and request limits
   maxRequestBytes: num("MAX_REQUEST_BYTES", "50000", 1000),
-
-  // rate limiting
   rateLimitWindowMs: num("RATE_LIMIT_WINDOW_MS", "60000", 1000),
   rateLimitMax: num("RATE_LIMIT_MAX", "60", 1),
 
-  // cleanup job
+  // Background cleanup job
   ttlCron: process.env.TTL_CRON ?? "0 3 * * *",
   ttlEnabled: bool("TTL_ENABLED", "true"),
 
-  // retention for used records
-  usedRetentionHoursInviteCodes: num(
-    "USED_RETENTION_HOURS_INVITE_CODES",
-    "24",
-    0,
-  ),
-  usedRetentionHoursLoginProofs: num(
-    "USED_RETENTION_HOURS_LOGIN_PROOFS",
-    "24",
-    0,
-  ),
+  // Data retention for used records
+  usedRetentionHoursInviteCodes: num("USED_RETENTION_HOURS_INVITE_CODES", "24", 0),
+  usedRetentionHoursLoginProofs: num("USED_RETENTION_HOURS_LOGIN_PROOFS", "24", 0),
 
-  // ttl settings
+  // Resource lifespans (TTL)
   userTtlDays: num("USER_TTL_DAYS", "14", 0),
   inviteTtlHours: num("INVITE_TTL_HOURS", "24", 0),
   sessionTtlMinutes: num("SESSION_TTL_MINUTES", "60", 0),
-
   qrResolutionTtlMinutes: num("QR_RESOLUTION_TTL_MINUTES", "5", 0),
   webauthnChallengeTtlMinutes: num("WEBAUTHN_CHALLENGE_TTL_MINUTES", "5", 0),
   loginProofTtlMinutes: num("LOGIN_PROOF_TTL_MINUTES", "5", 0),
-
   qrLinkRetentionHours: num("QR_LINK_RETENTION_HOURS", "336", 0),
 
-  // webauthn
+  // WebAuthn configuration
   rpId: requireEnv("RP_ID", "localhost"),
   rpName: requireEnv("RP_NAME", "Backend demo"),
   origin: requireEnv("ORIGIN", "http://localhost:3000"),
 
-  // ai configuration
+  // AI provider settings
   aiMode: requireEnv("AI_MODE", "stub"),
   aiBaseUrl: process.env.AI_BASE_URL ?? "",
   aiApiKey: process.env.AI_API_KEY ?? "",
   aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1),
 
-  // chat retention and context
+  // Chat and context limits
   messageTtlDays: num("MESSAGE_TTL_DAYS", "14", 0),
   messageContextLimit: num("MESSAGE_CONTEXT_LIMIT", "20", 1),
   chatMessageMaxLength: num("CHAT_MESSAGE_MAX_LENGTH", "20000", 1),
 
-  // ai testing flags
+  // Testing and debugging flags
   testStubSleepMs: num("TEST_STUB_SLEEP_MS", "0", 0),
   testReplyFail: bool("TEST_REPLY_FAIL", "false"),
   testSummaryFail: bool("TEST_SUMMARY_FAIL", "false"),
