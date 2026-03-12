@@ -7,6 +7,7 @@ import { ChatPage } from "./pages/ChatPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import RequireAuth from "./routes/RequireAuth";
 import { LandingGate } from "./routes/LandingGate";
+import { AdminPage } from "./pages/AdminPage";
 
 export const App: React.FC = () => {
   return (
@@ -14,27 +15,28 @@ export const App: React.FC = () => {
       <Background />
       <div className="app-content">
         <Routes>
-          <Route path="/" element={<LandingGate />} />
-          <Route path="/start" element={<StartPage />} />
-          <Route path="/passkey" element={<PasskeyPage />} />
-          <Route
-            path="/chat"
-            element={
-              <RequireAuth>
-                <ChatPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <RequireAuth>
-                <ProfilePage />
-              </RequireAuth>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+  <Route path="/" element={<LandingGate />} />
+  <Route path="/start" element={<StartPage />} />
+  <Route path="/passkey" element={<PasskeyPage />} />
+  <Route path="/admin" element={<AdminPage />} />
+  <Route
+    path="/chat"
+    element={
+      <RequireAuth>
+        <ChatPage />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/profile"
+    element={
+      <RequireAuth>
+        <ProfilePage />
+      </RequireAuth>
+    }
+  />
+  <Route path="*" element={<Navigate to="/" replace />} />
+</Routes>
       </div>
     </div>
   );

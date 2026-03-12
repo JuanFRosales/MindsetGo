@@ -58,7 +58,7 @@ export const buildApp = () => {
   registerErrorHandler(app);
   registerSessionAuth(app);
 
-  // IMPORTANT: call directly so it attaches to root instance
+  // call directly so it attaches to root instance
   rateLimitPlugin(app);
 
   app.register(healthRoutes);
@@ -68,6 +68,7 @@ export const buildApp = () => {
   app.register(qrRoutes);
   app.register(webauthnRoutes);
   app.register(chatRoutes);
+  
 
   return app;
 };

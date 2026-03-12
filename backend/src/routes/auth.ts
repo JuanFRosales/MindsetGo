@@ -53,11 +53,8 @@ export const authRoutes = async (app: FastifyInstance): Promise<void> => {
     },
   );
 
-  /**
-   * Kirjautuminen kutsukoodilla
-   * Jos koodi on jo liitetty käyttäjään, tehdään sessio samalle käyttäjälle
-   * Muuten luodaan uusi käyttäjä ja liitetään koodi siihen
-   */
+
+  //Login with invite code, if code is linked to user, create session for that user
   app.post(
     "/auth/qr",
     {

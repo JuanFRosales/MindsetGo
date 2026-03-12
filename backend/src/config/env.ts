@@ -30,7 +30,10 @@ export const env = {
   port: num("PORT", "3000", 1),
   dbPath: requireEnv("DB_PATH", "./data/app.db"),
   adminKey: requireEnv("ADMIN_KEY", "dev-admin-key"),
+  
+  // cookies
   cookieName: requireEnv("COOKIE_NAME", "sid"),
+  adminCookieName: requireEnv("ADMIN_COOKIE_NAME", "admin_sid"), // New variable added here
 
   // maximum allowed body size for incoming requests
   maxRequestBytes: num("MAX_REQUEST_BYTES", "50000", 1000),
@@ -75,7 +78,7 @@ export const env = {
   aiMode: requireEnv("AI_MODE", "stub"),
   aiBaseUrl: process.env.AI_BASE_URL ?? "",
   aiApiKey: process.env.AI_API_KEY ?? "",
-aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1),
+  aiTimeoutMs: num("AI_TIMEOUT_MS", "15000", 1),
 
   // chat retention and context
   messageTtlDays: num("MESSAGE_TTL_DAYS", "14", 0),

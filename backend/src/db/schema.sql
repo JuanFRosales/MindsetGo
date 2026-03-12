@@ -22,6 +22,15 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions(userId);
 CREATE INDEX IF NOT EXISTS idx_sessions_expiresAt ON sessions(expiresAt);
 
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at
+ON admin_sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS qr_links (
   qrId TEXT PRIMARY KEY,
   userId TEXT NOT NULL,

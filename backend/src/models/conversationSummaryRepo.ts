@@ -14,6 +14,7 @@ export type ConversationSummaryRow = {
   ActivityTracked &
   Expirable;
 
+// Create or update a summary
 export const upsertConversationSummary = async (
   db: Database,
   input: { userId: EntityId; conversationId: EntityId; summaryText: string; ttlDays: number },
@@ -39,6 +40,7 @@ export const upsertConversationSummary = async (
   );
 };
 
+// Get a single summary
 export const getConversationSummary = async (
   db: Database,
   userId: EntityId,
@@ -56,6 +58,23 @@ export const getConversationSummary = async (
   return (row as unknown as ConversationSummaryRow) ?? null;
 };
 
+// List all summaries for a specific user
+export const listConversationSummariesByUserId = async (
+  db: Database,
+  userId: EntityId,
+): Promise<ConversationSummaryRow[]> => {
+  const rows = await db.all<ConversationSummaryRow[]>(
+    `SELECT id, userId, conversationId, summaryText, createdAt, lastActiveAt, expiresAt
+     FROM conversation_summary
+     WHERE userId = ?
+     ORDER BY lastActiveAt DESC`,
+    userId,
+  );
+
+  return (rows as unknown as ConversationSummaryRow[]) ?? [];
+};
+
+// Delete a specific summary
 export const deleteConversationSummary = async (
   db: Database,
   userId: EntityId,

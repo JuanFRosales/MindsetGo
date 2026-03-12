@@ -14,6 +14,16 @@ export default defineConfig({
       "/user": "http://localhost:3000",
       "/profile": "http://localhost:3000",
       "/health": "http://localhost:3000",
+
+      "/admin/login": "http://localhost:3000",
+      "/admin/me": "http://localhost:3000",
+      "/admin/logout": "http://localhost:3000",
+      "/admin/invites": "http://localhost:3000",
+      "/admin/cleanup": "http://localhost:3000",
+      "/admin/expire-test-data": "http://localhost:3000",
+      "/admin/db-info": "http://localhost:3000",
+      "/admin/db-counts": "http://localhost:3000",
+      "/admin/users": "http://localhost:3000",
     },
   },
 });

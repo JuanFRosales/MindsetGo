@@ -198,3 +198,88 @@ a{ color: inherit; }
   z-index: 21;
   overflow: auto;
 }
+
+.spacer-lg{ height: 18px; }
+
+.badge{
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-container{
+  max-width: 560px;
+  align-self: flex-start;
+}
+
+.admin-code-box{
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.95);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
+.admin-qr-wrap{
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.16);
+}
+
+.admin-qr-image{
+  width: min(280px, 100%);
+  height: auto;
+  display: block;
+  border-radius: 16px;
+  background: white;
+}
+
+.admin-row-actions{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.admin-summary-text{
+  white-space: pre-wrap;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.90);
+  word-break: break-word;
+}
+
+.admin-loading-card {
+  text-align: center;
+  padding: 40px;
+}
+
+.admin-invite-qr-card {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.admin-qr-wrapper {
+  background: #fff;
+  padding: 20px;
+  display: inline-block;
+  border-radius: 8px;
+}
+
+.admin-invite-code {
+  margin-top: 15px;
+}
+
+.admin-invite-actions {
+  justify-content: center;
+  gap: 10px;
+}

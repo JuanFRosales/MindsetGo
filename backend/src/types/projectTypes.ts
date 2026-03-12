@@ -1,3 +1,5 @@
+
+
 // Next function type for middleware
 export type NextFunction = (err?: Error) => void;
 // Async middleware type
@@ -30,4 +32,5 @@ export type ActivityTracked = {
 export type RequestUserContext = {
   currentUserId?: EntityId;
 };
+
 
