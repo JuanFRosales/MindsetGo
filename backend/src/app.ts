@@ -4,13 +4,13 @@ import { registerErrorHandler } from "./middlewares/errorHandler.ts";
 import { registerSessionAuth } from "./middlewares/sessionAuth.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { userRoutes } from "./routes/users.ts";
-import { authRoutes } from "./routes/auth.ts";
-import { adminRoutes } from "./routes/admin.ts";
+import { authRoutes } from "./routes/auth/authRoutes.ts";
+import { adminRoutes } from "./routes/admin/adminRoutes.ts";
 import { qrRoutes } from "./routes/qr.ts";
 import { webauthnRoutes } from "./routes/webauthn.ts";
 import staticPlugin from "@fastify/static";
 import { join } from "node:path";
-import { chatRoutes } from "./routes/chat.ts";
+import { chatRoutes } from "./routes/chat/chatRoutes.ts";
 import { rateLimitPlugin } from "./plugins/rateLimit.ts";
 import { env } from "./config/env.ts";
 
@@ -68,7 +68,7 @@ export const buildApp = () => {
   app.register(qrRoutes);
   app.register(webauthnRoutes);
   app.register(chatRoutes);
-  
+
 
   return app;
 };

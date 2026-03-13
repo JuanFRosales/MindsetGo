@@ -2,11 +2,15 @@ import type { Database } from "sqlite";
 import { uuidv7 } from "../utils/uuidv7.ts";
 import type { EntityId, Timestamps, Expirable, ActivityTracked } from "../types/projectTypes.ts";
 
+// Helper for current timestamp in milliseconds
 const nowMs = (): number => Date.now();
+
+// Calculate expiration timestamp based on days from now
 const daysFromNow = (days: number): number => nowMs() + days * 24 * 60 * 60 * 1000;
 
 export type MessageRole = "user" | "assistant";
 
+// Data structure for a message record in the database
 export type MessageRow = {
   id: EntityId;
   userId: EntityId;
@@ -17,6 +21,7 @@ export type MessageRow = {
   ActivityTracked &
   Expirable;
 
+// Insert a new message into the database with UUIDv7
 export const createMessage = async (
   db: Database,
   input: {
@@ -56,6 +61,7 @@ export const createMessage = async (
   return row;
 };
 
+// Update existing message content and refresh its expiration
 export const updateMessageContent = async (
   db: Database,
   id: EntityId,
@@ -72,6 +78,7 @@ export const updateMessageContent = async (
   );
 };
 
+// Retrieve a limited list of recent messages for a specific conversation
 export const listRecentMessages = async (
   db: Database,
   userId: EntityId,
@@ -93,6 +100,7 @@ export const listRecentMessages = async (
   return (rows as unknown as MessageRow[]) ?? [];
 };
 
+// Fetch a single message by its ID and user ownership
 export const getMessageById = async (
   db: Database,
   userId: EntityId,
@@ -110,6 +118,7 @@ export const getMessageById = async (
   return (row as unknown as MessageRow) ?? null;
 };
 
+// Delete a specific message by ID
 export const deleteMessageById = async (
   db: Database,
   userId: EntityId,
@@ -124,6 +133,7 @@ export const deleteMessageById = async (
   return (res?.changes ?? 0) > 0;
 };
 
+// Delete all messages associated with a specific conversation
 export const deleteConversationMessages = async (
   db: Database,
   userId: EntityId,

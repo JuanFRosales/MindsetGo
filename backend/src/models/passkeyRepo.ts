@@ -1,7 +1,7 @@
 import type { Database } from "sqlite";
 import type { EntityId, Timestamps } from "../types/projectTypes.ts";
 
-
+// Check if a user has at least one passkey registered
 export const userHasPasskey = async (db: Database, userId: string): Promise<boolean> => {
   const row = await db.get<{ c: number }>(
    "SELECT COUNT(1) as c FROM passkeys WHERE userId = ?",
@@ -10,7 +10,7 @@ export const userHasPasskey = async (db: Database, userId: string): Promise<bool
   return (row?.c ?? 0) > 0;
 };
 
-
+// Data structure for a registered WebAuthn credential
 export type Passkey = {
   userId: EntityId;
   credentialId: string;
@@ -18,7 +18,7 @@ export type Passkey = {
   counter: number;
 } & Timestamps;
 
-// Retrieve a passkey by user ID
+// Retrieve passkey data for a specific user
 export const getPasskeyByUserId = async (db: Database, userId: EntityId): Promise<Passkey | null> => {
   const row = await db.get<Passkey>(
     "SELECT userId, credentialId, publicKey, counter, createdAt FROM passkeys WHERE userId = ?",
@@ -27,7 +27,7 @@ export const getPasskeyByUserId = async (db: Database, userId: EntityId): Promis
   return row ?? null;
 };
 
-// Insert or update a passkey for a user
+// Create or update the user's single allowed passkey
 export const upsertSinglePasskey = async (db: Database, passkey: Passkey): Promise<void> => {
   await db.run(
     `INSERT INTO passkeys (userId, credentialId, publicKey, counter, createdAt)
@@ -44,7 +44,7 @@ export const upsertSinglePasskey = async (db: Database, passkey: Passkey): Promi
   );
 };
 
-// Update the signature counter to prevent replay attacks
+// Update the signature counter to prevent replay attacks during authentication
 export const updateCounter = async (db: Database, userId: EntityId, counter: number): Promise<void> => {
   await db.run("UPDATE passkeys SET counter = ? WHERE userId = ?", counter, userId);
 };

@@ -16,7 +16,7 @@ export const registerErrorHandler = (app: FastifyInstance): void => {
       req.log.info(logData, "request_rejected");
     }
 
-    // --- client responses (no sensitive details) ---
+    // client responses (no sensitive details)
 
     // handle body too large specifically
     if (err.code === "FST_ERR_CTP_BODY_TOO_LARGE" || status === 413) {

@@ -2,9 +2,13 @@ import type { Database } from "sqlite";
 import { uuidv7 } from "../utils/uuidv7.ts";
 import type { EntityId, Timestamps, Expirable, ActivityTracked } from "../types/projectTypes.ts";
 
+// Helper for current timestamp in milliseconds
 const nowMs = (): number => Date.now();
+
+// Calculate expiration timestamp based on days from now
 const daysFromNow = (days: number): number => nowMs() + days * 24 * 60 * 60 * 1000;
 
+// Data structure for a user's AI-generated profile state
 export type ProfileStateRow = {
   id: EntityId;
   userId: EntityId;
@@ -13,6 +17,7 @@ export type ProfileStateRow = {
   ActivityTracked &
   Expirable;
 
+// Create or update a profile state for a specific user
 export const upsertProfileState = async (
   db: Database,
   input: { userId: EntityId; stateJson: string; ttlDays: number },
@@ -36,6 +41,7 @@ export const upsertProfileState = async (
   );
 };
 
+// Fetch profile state by user ID
 export const getProfileState = async (
   db: Database,
   userId: EntityId,
@@ -51,6 +57,7 @@ export const getProfileState = async (
   return (row as unknown as ProfileStateRow) ?? null;
 };
 
+// Remove profile state for a user
 export const deleteProfileState = async (
   db: Database,
   userId: EntityId,

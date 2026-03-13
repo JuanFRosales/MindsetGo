@@ -1,20 +1,11 @@
 import crypto from "node:crypto";
 import { getDb } from "../db/sqlite.ts";
+import type { AdminSessionRow, AdminSessionDbRow } from "../types/projectTypes.ts";
 
+// Set admin session duration to 8 hours
 const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 
-type AdminSessionDbRow = {
-  id: string;
-  created_at: number | string;
-  expires_at: number | string;
-};
-
-export type AdminSessionRow = {
-  id: string;
-  createdAt: number;
-  expiresAt: number;
-};
-
+// Create a new unique admin session in the database
 export const createAdminSession = async (): Promise<string> => {
   const db = await getDb();
   const id = crypto.randomUUID();
@@ -34,6 +25,7 @@ export const createAdminSession = async (): Promise<string> => {
   return id;
 };
 
+// Retrieve an admin session by its unique ID
 export const getAdminSession = async (
   id: string,
 ): Promise<AdminSessionRow | null> => {
@@ -57,6 +49,7 @@ export const getAdminSession = async (
   };
 };
 
+// Manually revoke an admin session by ID
 export const deleteAdminSession = async (id: string): Promise<void> => {
   const db = await getDb();
 
@@ -69,6 +62,7 @@ export const deleteAdminSession = async (id: string): Promise<void> => {
   );
 };
 
+// Periodically remove all expired sessions from the database
 export const cleanupExpiredAdminSessions = async (): Promise<void> => {
   const db = await getDb();
   const now = Date.now();

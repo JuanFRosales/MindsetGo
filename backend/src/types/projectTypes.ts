@@ -34,3 +34,15 @@ export type RequestUserContext = {
 };
 
 
+
+export type AdminSessionDbRow = {
+  id: string;
+  created_at: number | string;
+  expires_at: number | string;
+};
+
+export type AdminSessionRow = {
+  id: string;
+  createdAt: number;
+  expiresAt: number;
+};
