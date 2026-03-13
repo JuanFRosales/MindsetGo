@@ -22,7 +22,7 @@ The current project phase focuses on:
 
 The system is designed as a foundational prototype for an anonymous conversational support service.
 
-The emphasis of this thesis is on:
+The emphasis of this project is on:
 
 * Technical architecture
 * Privacy-by-design implementation
@@ -51,7 +51,7 @@ It provides:
 * Automatic data expiration
 * Strict API validation and redacted logging
 
-No email, name, IP address, or device fingerprint is stored.  
+No email, name, IP address, or phone numjber is stored.  
 User identity is represented solely by a random UUID v7.
 
 The authentication layer exists as infrastructure that enables safe conversational interaction without compromising privacy.
@@ -193,7 +193,6 @@ The following design constraints are enforced.
 * No email addresses are required
 * No usernames are required
 * No IP addresses are stored
-* No device fingerprints are collected
 * User identity exists only as a random UUID
 
 All time-sensitive records such as sessions and linking tokens are automatically expired and cleaned up.
