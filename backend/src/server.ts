@@ -10,12 +10,12 @@ registerTtlCleanupJob(app);
 // Server start and shutdown handling
 const start = async (): Promise<void> => {
   try {
-    // 1. Aja migraatiot ennen palvelimen käynnistystä
+    // Run database migrations before starting the server
     app.log.info("Running database migrations...");
     await migrate();
     app.log.info("Migrations completed successfully.");
 
-    // 2. Start the server
+    // Start the server
     const address = await app.listen({
       port: env.port,
       host: "0.0.0.0"
