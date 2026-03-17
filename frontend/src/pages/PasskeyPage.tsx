@@ -5,6 +5,7 @@ import { api, type ApiError } from "../lib/api";
 import { prettyApiError } from "../lib/prettyError";
 import { useToast } from "../state/toast";
 import { useAuth } from "../state/auth";
+import { qrIdStore } from "../state/qrIdStore";
 
 type NavState = { userId: string; resolutionId: string };
 
@@ -12,6 +13,7 @@ type RegisterOptionsRes = { challengeId: string; publicKey: any };
 type LoginOptionsRes = { challengeId: string; publicKey: any };
 type LoginVerifyRes = { ok: true; userId: string; proofId: string };
 
+// Map backend error codes to user-friendly UI messages
 const prettyError = (e: ApiError): string => {
   if (e.error === "invalid_resolutionId") return "Istunto on vanhentunut. Palaa alkuun.";
   if (e.error === "invalid_challenge") return "Vahvistus vanhentui. Yritä uudelleen.";
@@ -35,6 +37,7 @@ export const PasskeyPage: React.FC = () => {
   const [mode, setMode] = useState<"checking" | "create" | "login">("checking");
   const [busy, setBusy] = useState(false);
 
+  // Check if the user already has a passkey to determine whether to show login or registration
   useEffect(() => {
     if (!state?.userId || !state?.resolutionId) {
       nav("/start");
@@ -46,20 +49,15 @@ export const PasskeyPage: React.FC = () => {
         await api.post<LoginOptionsRes>("/webauthn/login/options", { userId: state.userId });
         setMode("login");
       } catch (e) {
-        const err = e as ApiError;
-        if (err.error === "no_passkey" || err.error === "404" || err.error === "network_error") {
-          setMode("create");
-          return;
-        }
-        if (err.error === "no_passkey") setMode("create");
-        else if (err.error === "network_error") setMode("create");
-        else setMode("create");
+        // Default to creation mode if no passkey is found or in case of network issues
+        setMode("create");
       }
     };
 
     void check();
   }, [nav, state]);
 
+  // Handle the WebAuthn registration flow (creating a new passkey)
   const registerPasskey = async () => {
     if (!state) return;
     setBusy(true);
@@ -78,6 +76,7 @@ export const PasskeyPage: React.FC = () => {
     }
   };
 
+  // Handle the WebAuthn authentication flow (logging in with existing passkey)
   const loginPasskey = async () => {
     if (!state) return;
     setBusy(true);
@@ -100,6 +99,22 @@ export const PasskeyPage: React.FC = () => {
       }
       toast.show(prettyError(err));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  // Clear session and local device ID, then return to start to scan a new code
+  const resetDeviceAndReturnToStart = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Ignore logout errors
+    } finally {
+      qrIdStore.clear();
+      toast.show("Kirjauduit ulos. Skannaa uusi QR koodi.");
+      nav("/start", { replace: true });
       setBusy(false);
     }
   };
@@ -129,6 +144,10 @@ export const PasskeyPage: React.FC = () => {
             <button className="btn" onClick={() => setMode("login")} disabled={busy}>
               Minulla on jo passkey
             </button>
+            <div className="spacer" />
+            <button className="btn danger" onClick={resetDeviceAndReturnToStart} disabled={busy}>
+              Skannaa toinen QR koodi
+            </button>
           </>
         ) : null}
 
@@ -143,6 +162,10 @@ export const PasskeyPage: React.FC = () => {
             <div className="spacer" />
             <button className="btn" onClick={() => setMode("create")} disabled={busy}>
               Luo passkey uudelleen
+            </button>
+            <div className="spacer" />
+            <button className="btn danger" onClick={resetDeviceAndReturnToStart} disabled={busy}>
+              Kirjaudu toisella käyttäjällä
             </button>
           </>
         ) : null}

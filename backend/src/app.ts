@@ -7,7 +7,7 @@ import { userRoutes } from "./routes/users.ts";
 import { authRoutes } from "./routes/auth/authRoutes.ts";
 import { adminRoutes } from "./routes/admin/adminRoutes.ts";
 import { qrRoutes } from "./routes/qr.ts";
-import { webauthnRoutes } from "./routes/webauthn.ts";
+import { webauthnRoutes } from "./routes/webauthn/webauthn.ts";
 import staticPlugin from "@fastify/static";
 import { join } from "node:path";
 import { chatRoutes } from "./routes/chat/chatRoutes.ts";
@@ -30,10 +30,10 @@ export const buildApp = () => {
           "req.body",
           "req.query",
           "req.params",
-          "res.headers['set-cookie']"
+          "res.headers['set-cookie']",
         ],
-        censor: "***"
-      }
+        censor: "***",
+      },
     },
   });
 
@@ -50,7 +50,7 @@ export const buildApp = () => {
 
   app.register(staticPlugin, {
     root: join(process.cwd(), "public"),
-    prefix: "/"
+    prefix: "/",
   });
 
   app.register(cookie);
@@ -68,7 +68,6 @@ export const buildApp = () => {
   app.register(qrRoutes);
   app.register(webauthnRoutes);
   app.register(chatRoutes);
-
 
   return app;
 };

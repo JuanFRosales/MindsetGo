@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { type ApiError, api } from "../lib/api";
+import { type ApiError } from "../lib/api";
 import { prettyApiError } from "../lib/prettyError";
 import { qrScanThrottled, type QrScanResult } from "../lib/qrScanThrottled";
 import { qrIdStore } from "../state/qrIdStore";
@@ -58,19 +58,6 @@ export const StartPage: React.FC = () => {
     await scan(inviteCode);
   };
 
-  const onResetDevice = () => {
-    qrIdStore.clear();
-    const fresh = qrIdStore.ensure();
-    toast.show("Laite tunniste nollattu.");
-
-    setInviteCode("");
-    setQr(null);
-    setStatus("needsInvite");
-
-    void api.post("/auth/logout").catch(() => {});
-
-    void qrScanThrottled({ qrId: fresh }).catch(() => {});
-  };
 
   const onScanned = (value: string) => {
     setInviteCode(value);
@@ -111,15 +98,7 @@ export const StartPage: React.FC = () => {
               Skannaa kameralla
             </button>
 
-            <div className="spacer-lg" />
-
-            <div className="small">
-              Jos vaihdoit laitetta tai haluat aloittaa alusta, voit nollata laitetunnisteen.
-            </div>
-
-            <button className="btn" onClick={onResetDevice} disabled={busy}>
-              Nollaa laite
-            </button>
+         
           </>
         ) : null}
 

@@ -19,6 +19,7 @@ type AdminDashboardProps = {
   onLogout: () => void | Promise<void>;
 };
 
+// Helper to construct the patient-facing QR registration URL
 const buildInviteUrl = (code: string): string => {
   const origin = window.location.origin;
   return `${origin}/qr?code=${encodeURIComponent(code)}`;
@@ -33,6 +34,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
 
+  // State ticks to trigger side effects without creating circular dependencies in hooks
+  const [usersUnauthorizedTick, setUsersUnauthorizedTick] = useState(0);
+  const [detailsUnauthorizedTick, setDetailsUnauthorizedTick] = useState(0);
+
+  // Stable callback for the users list hook (prevents infinite re-renders)
+  const handleUsersUnauthorized = useCallback(() => {
+    setUsersUnauthorizedTick((v) => v + 1);
+  }, []);
+
+  // Stable callback for the user details hook (prevents infinite re-renders)
+  const handleDetailsUnauthorized = useCallback(() => {
+    setDetailsUnauthorizedTick((v) => v + 1);
+  }, []);
+
   const {
     users,
     loading,
@@ -46,13 +61,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     clearSummaries,
     clearUsers,
   } = useAdminUsers({
-    onUnauthorized: () => {
-      setInviteCode(null);
-      setInviteUrl(null);
-      clearSummaries();
-      clearUsers();
-      toast.show("Istunto vanheni. Kirjaudu uudelleen.");
-    },
+    onUnauthorized: handleUsersUnauthorized,
   });
 
   const {
@@ -64,16 +73,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     openUserDetails,
     clearUserDetails,
   } = useAdminUserDetails({
-    onUnauthorized: () => {
-      setInviteCode(null);
-      setInviteUrl(null);
-      clearSummaries();
-      clearUserDetails();
-      clearUsers();
-      toast.show("Istunto vanheni. Kirjaudu uudelleen.");
-    },
+    onUnauthorized: handleDetailsUnauthorized,
   });
 
+  // Effect to clean up state when session expires during user list fetching
+  useEffect(() => {
+    if (usersUnauthorizedTick === 0) return;
+    setInviteCode(null);
+    setInviteUrl(null);
+    clearSummaries();
+    clearUsers();
+    toast.show("Istunto vanheni. Kirjaudu uudelleen.");
+  }, [usersUnauthorizedTick, clearSummaries, clearUsers, toast]);
+
+  // Effect to clean up state when session expires during user detail fetching
+  useEffect(() => {
+    if (detailsUnauthorizedTick === 0) return;
+    setInviteCode(null);
+    setInviteUrl(null);
+    clearSummaries();
+    clearUserDetails();
+    clearUsers();
+    toast.show("Istunto vanheni. Kirjaudu uudelleen.");
+  }, [detailsUnauthorizedTick, clearSummaries, clearUserDetails, clearUsers, toast]);
+
+  // Manual local data cleanup (used during standard logout)
   const clearLocalAdminData = useCallback(() => {
     setInviteCode(null);
     setInviteUrl(null);
@@ -246,22 +270,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <strong>Koodi:</strong> {inviteCode}
           </p>
 
-          <p style={{ wordBreak: "break-all" }}>
-            <strong>Linkki:</strong> {inviteUrl}
-          </p>
-
           <div className="row" style={{ justifyContent: "center", gap: "10px" }}>
             <button
               className="btn"
               onClick={() => inviteCode && void copyText(inviteCode, "Koodi kopioitu")}
             >
               Kopioi koodi
-            </button>
-            <button
-              className="btn"
-              onClick={() => inviteUrl && void copyText(inviteUrl, "Linkki kopioitu")}
-            >
-              Kopioi linkki
             </button>
           </div>
         </div>
