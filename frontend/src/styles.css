@@ -283,3 +283,23 @@ a{ color: inherit; }
   justify-content: center;
   gap: 10px;
 }
+.admin-container .btn.primary {
+  border-color: rgba(255,255,255,0.28);
+}
+
+.admin-menu-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
